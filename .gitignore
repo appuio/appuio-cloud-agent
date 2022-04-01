@@ -13,3 +13,6 @@ node_modules/
 
 # kind
 .kind/
+
+# tem cert
+webhook-certs/

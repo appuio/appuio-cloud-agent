@@ -5,12 +5,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/appuio/appuio-cloud-agent/webhooks"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var (
@@ -40,7 +42,7 @@ func main() {
 	enableLeaderElection := flag.Bool("leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	probeAddr := flag.String("health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	probeAddr := flag.String("health-probe-bind-address", ":8082", "The address the probe endpoint binds to.")
 	webhookCertDir := flag.String("webhook-cert-dir", "", "Directory holding TLS certificate and key for the webhook server. If left empty, {TempDir}/k8s-webhook-server/serving-certs is used")
 	webhookPort := flag.Int("webhook-port", 9443, "The port on which the admission webhooks are served")
 
@@ -64,6 +66,10 @@ func main() {
 		setupLog.Error(err, "unable to setup manager")
 		os.Exit(1)
 	}
+
+	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
+		Handler: &webhooks.RatioValidator{},
+	})
 
 	//+kubebuilder:scaffold:builder
 
