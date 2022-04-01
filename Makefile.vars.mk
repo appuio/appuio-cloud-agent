@@ -1,9 +1,8 @@
 ## These are some common variables for Make
 
 PROJECT_ROOT_DIR = .
-# TODO: Adjust project meta
-PROJECT_NAME ?= go-bootstrap
-PROJECT_OWNER ?= vshn
+PROJECT_NAME ?= appuio-cloud-agent
+PROJECT_OWNER ?= appuio
 
 ## BUILD:go
 BIN_FILENAME ?= $(PROJECT_NAME)
