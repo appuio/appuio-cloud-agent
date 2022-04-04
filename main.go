@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/appuio/appuio-cloud-agent/webhooks"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -46,6 +47,7 @@ func main() {
 	webhookCertDir := flag.String("webhook-cert-dir", "", "Directory holding TLS certificate and key for the webhook server. If left empty, {TempDir}/k8s-webhook-server/serving-certs is used")
 	webhookPort := flag.Int("webhook-port", 9443, "The port on which the admission webhooks are served")
 
+	memoryCpuRatio := flag.String("memory-per-core-limit", "4Gi", "The fair use limit of memory usage per CPU core")
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -67,8 +69,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	limit, err := resource.ParseQuantity(*memoryCpuRatio)
+	if err != nil {
+		setupLog.Error(err, "unable to parse memory-per-core-limit")
+		os.Exit(1)
+	}
 	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
-		Handler: &webhooks.RatioValidator{},
+		Handler: &webhooks.RatioValidator{
+			RatioLimit: &limit,
+		},
 	})
 
 	//+kubebuilder:scaffold:builder
