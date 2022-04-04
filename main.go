@@ -47,7 +47,7 @@ func main() {
 	webhookCertDir := flag.String("webhook-cert-dir", "", "Directory holding TLS certificate and key for the webhook server. If left empty, {TempDir}/k8s-webhook-server/serving-certs is used")
 	webhookPort := flag.Int("webhook-port", 9443, "The port on which the admission webhooks are served")
 
-	memoryCpuRatio := flag.String("memory-per-core-limit", "4Gi", "The fair use limit of memory usage per CPU core")
+	memoryCPURatio := flag.String("memory-per-core-limit", "4Gi", "The fair use limit of memory usage per CPU core")
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -69,7 +69,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	limit, err := resource.ParseQuantity(*memoryCpuRatio)
+	limit, err := resource.ParseQuantity(*memoryCPURatio)
 	if err != nil {
 		setupLog.Error(err, "unable to parse memory-per-core-limit")
 		os.Exit(1)

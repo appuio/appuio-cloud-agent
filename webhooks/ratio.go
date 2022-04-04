@@ -32,13 +32,16 @@ func (r ratio) ratio() *resource.Quantity {
 	if r.cpu.IsZero() {
 		return resource.NewQuantity(math.MaxInt64, resource.BinarySI)
 	}
-	return resource.NewQuantity(int64(r.memory.AsApproximateFloat64()/r.cpu.AsApproximateFloat64()), resource.BinarySI)
+	return resource.NewQuantity(
+		int64(r.memory.AsApproximateFloat64()/r.cpu.AsApproximateFloat64()),
+		resource.BinarySI)
 }
 
 func (r ratio) below(limit resource.Quantity) bool {
 	return r.ratio().Cmp(limit) < 0
 }
 
+// String implements Stringer to print ratio
 func (r ratio) String() string {
 	return r.ratio().String()
 }

@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// UserValidator holds context for the validating admission webhook for users.appuio.io
+// RatioValidator checks for every action in a namespace whether the Memory to CPU ratio limit is exceeded and will return a warning if it is.
 type RatioValidator struct {
 	client  client.Client
 	decoder *admission.Decoder
@@ -23,14 +23,16 @@ type RatioValidator struct {
 	RatioLimit *resource.Quantity
 }
 
-// Handle handles the users.appuio.io admission requests
+// Handle handles the admission requests
 func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
-	l := log.FromContext(ctx).WithName("webhook.validate-request-ratio.appuio.io")
 	if strings.HasPrefix(req.UserInfo.Username, "system:") {
+		// Is service account or kube system user: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-subjects
 		return admission.Allowed("system user")
 	}
 
-	l.V(3).WithValues("kind", req.RequestKind.Kind, "namespace", req.Namespace).Info("handling request")
+	l := log.FromContext(ctx).WithName("webhook.validate-request-ratio.appuio.io")
+	l.V(3).WithValues("kind", req.Kind.Kind, "namespace", req.Namespace).Info("handling request")
+
 	r, err := v.getRatio(ctx, req.Namespace)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
@@ -56,13 +58,13 @@ func (v *RatioValidator) getRatio(ctx context.Context, ns string) (*ratio, error
 	return r.recordPod(pods.Items...), nil
 }
 
-// InjectDecoder injects a Admission request decoder into the UserValidator
+// InjectDecoder injects a Admission request decoder
 func (v *RatioValidator) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
 }
 
-// InjectClient injects a Kubernetes client into the UserValidator
+// InjectClient injects a Kubernetes client
 func (v *RatioValidator) InjectClient(c client.Client) error {
 	v.client = c
 	return nil
