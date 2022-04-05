@@ -152,7 +152,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 			warn:   true,
 			create: true,
 		},
-    "Warn_ConsiderNewStatefulset": {
+		"Warn_ConsiderNewStatefulset": {
 			user:      "appuio#foo",
 			namespace: "foo",
 			resources: []client.Object{
@@ -167,7 +167,6 @@ func TestRatioValidator_Handle(t *testing.T) {
 			warn:   true,
 			create: true,
 		},
-
 	}
 
 	for name, tc := range tests {
@@ -218,7 +217,11 @@ func TestRatioValidator_Handle(t *testing.T) {
 			resp := v.Handle(ctx, ar)
 			if tc.fail {
 				assert.Equal(t, tc.statusCode, resp.AdmissionResponse.Result.Code)
+				assert.True(t, resp.Allowed)
 				return
+			}
+			if resp.AdmissionResponse.Result != nil {
+				assert.EqualValues(t, http.StatusOK, resp.AdmissionResponse.Result.Code)
 			}
 			assert.True(t, resp.Allowed)
 			if tc.warn {

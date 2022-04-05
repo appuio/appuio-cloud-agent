@@ -10,6 +10,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -36,7 +37,7 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 
 	r, err := v.getRatio(ctx, req.Namespace)
 	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
+		return errored(http.StatusInternalServerError, err)
 	}
 
 	// If we are creating an object with resource requests, we add them to the current ratio
@@ -46,19 +47,19 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 		case "Pod":
 			pod := corev1.Pod{}
 			if err := v.decoder.Decode(req, &pod); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
+				return errored(http.StatusBadRequest, err)
 			}
 			r = r.RecordPod(pod)
 		case "Deployment":
 			deploy := appsv1.Deployment{}
 			if err := v.decoder.Decode(req, &deploy); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
+				return errored(http.StatusBadRequest, err)
 			}
 			r = r.RecordDeployment(deploy)
 		case "StatefulSet":
 			sts := appsv1.StatefulSet{}
 			if err := v.decoder.Decode(req, &sts); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
+				return errored(http.StatusBadRequest, err)
 			}
 			r = r.RecordStatefulSet(sts)
 		}
@@ -82,6 +83,18 @@ func (v *RatioValidator) getRatio(ctx context.Context, ns string) (*Ratio, error
 		return r, err
 	}
 	return r.RecordPod(pods.Items...), nil
+}
+
+func errored(code int32, err error) admission.Response {
+	return admission.Response{
+		AdmissionResponse: admissionv1.AdmissionResponse{
+			Allowed: true,
+			Result: &metav1.Status{
+				Code:    code,
+				Message: err.Error(),
+			},
+		},
+	}
 }
 
 // InjectDecoder injects a Admission request decoder
