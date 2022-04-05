@@ -2,12 +2,14 @@ package webhooks
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +35,8 @@ func TestRatioValidator_Handle(t *testing.T) {
 		user       string
 		namespace  string
 		resources  []client.Object
+		object     client.Object
+		create     bool
 		limit      string
 		warn       bool
 		fail       bool
@@ -115,6 +119,55 @@ func TestRatioValidator_Handle(t *testing.T) {
 			fail:       true,
 			statusCode: http.StatusInternalServerError,
 		},
+		"Warn_ConsiderNewPod": {
+			user:      "appuio#foo",
+			namespace: "foo",
+			resources: []client.Object{
+				podFromResources("pod1", "foo", podResource{
+					{cpu: "100m", memory: "4Gi"},
+				}),
+				podFromResources("pod2", "foo", podResource{
+					{cpu: "50m", memory: "4Gi"},
+				}),
+			},
+			object: podFromResources("unfair", "foo", podResource{
+				{cpu: "8", memory: "1Gi"},
+			}),
+			limit:  "4Gi",
+			warn:   true,
+			create: true,
+		},
+		"Warn_ConsiderNewDeployment": {
+			user:      "appuio#foo",
+			namespace: "foo",
+			resources: []client.Object{
+				podFromResources("pod1", "foo", podResource{
+					{cpu: "0", memory: "4Gi"},
+				}),
+			},
+			object: deploymentFromResources("unfair", "foo", 2, podResource{
+				{cpu: "1", memory: "1Gi"},
+			}),
+			limit:  "4Gi",
+			warn:   true,
+			create: true,
+		},
+    "Warn_ConsiderNewStatefulset": {
+			user:      "appuio#foo",
+			namespace: "foo",
+			resources: []client.Object{
+				podFromResources("pod1", "foo", podResource{
+					{cpu: "0", memory: "4Gi"},
+				}),
+			},
+			object: statefulsetFromResources("unfair", "foo", 2, podResource{
+				{cpu: "1", memory: "1Gi"},
+			}),
+			limit:  "4Gi",
+			warn:   true,
+			create: true,
+		},
+
 	}
 
 	for name, tc := range tests {
@@ -123,22 +176,17 @@ func TestRatioValidator_Handle(t *testing.T) {
 			limit := resource.MustParse(tc.limit)
 			v.RatioLimit = &limit
 
-			admissionRequest := admission.Request{
+			ar := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
 					UID: "e515f52d-7181-494d-a3d3-f0738856bd97",
 					Kind: metav1.GroupVersionKind{
 						Group:   "",
 						Version: "v1",
-						Kind:    "Pod",
-					},
-					Resource: metav1.GroupVersionResource{
-						Group:    "",
-						Version:  "v1",
-						Resource: "pods",
+						Kind:    "ConfigMap",
 					},
 					Name:      "test",
 					Namespace: tc.namespace,
-					Operation: admissionv1.Create,
+					Operation: admissionv1.Update,
 					UserInfo: authenticationv1.UserInfo{
 						Username: tc.user,
 						Groups: []string{
@@ -147,8 +195,27 @@ func TestRatioValidator_Handle(t *testing.T) {
 					},
 				},
 			}
+			if tc.object != nil {
+				kind := tc.object.GetObjectKind().GroupVersionKind()
+				ar.AdmissionRequest.Kind.Group = kind.Group
+				ar.AdmissionRequest.Kind.Version = kind.Version
+				ar.AdmissionRequest.Kind.Kind = kind.Kind
 
-			resp := v.Handle(ctx, admissionRequest)
+				ar.AdmissionRequest.Name = tc.object.GetName()
+
+				raw, err := json.Marshal(tc.object)
+				require.NoError(t, err)
+
+				ar.AdmissionRequest.Object = runtime.RawExtension{
+					Raw: raw,
+				}
+
+			}
+			if tc.create {
+				ar.AdmissionRequest.Operation = admissionv1.Create
+			}
+
+			resp := v.Handle(ctx, ar)
 			if tc.fail {
 				assert.Equal(t, tc.statusCode, resp.AdmissionResponse.Result.Code)
 				return
@@ -185,6 +252,10 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 
 func podFromResources(name, namespace string, res podResource) *corev1.Pod {
 	p := corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -206,6 +277,37 @@ func podFromResources(name, namespace string, res podResource) *corev1.Pod {
 		p.Spec.Containers = append(p.Spec.Containers, c)
 	}
 	return &p
+}
+
+func deploymentFromResources(name, namespace string, replicas int32, res podResource) *appsv1.Deployment {
+	deploy := appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	deploy.Spec.Replicas = &replicas
+	deploy.Spec.Template.Spec.Containers = newTestContainers(res)
+	return &deploy
+}
+func statefulsetFromResources(name, namespace string, replicas int32, res podResource) *appsv1.StatefulSet {
+	sts := appsv1.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	sts.Spec.Replicas = &replicas
+	sts.Spec.Template.Spec.Containers = newTestContainers(res)
+	return &sts
 }
 
 type failingClient struct {

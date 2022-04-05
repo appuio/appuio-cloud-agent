@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -38,7 +39,32 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	if r.below(*v.RatioLimit) {
+	// If we are creating an object with resource requests, we add them to the current ratio
+	// We cannot easily do this when updating resources.
+	if req.Operation == admissionv1.Create {
+		switch req.Kind.Kind {
+		case "Pod":
+			pod := corev1.Pod{}
+			if err := v.decoder.Decode(req, &pod); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			r = r.RecordPod(pod)
+		case "Deployment":
+			deploy := appsv1.Deployment{}
+			if err := v.decoder.Decode(req, &deploy); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			r = r.RecordDeployment(deploy)
+		case "StatefulSet":
+			sts := appsv1.StatefulSet{}
+			if err := v.decoder.Decode(req, &sts); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			r = r.RecordStatefulSet(sts)
+		}
+	}
+
+	if r.Below(*v.RatioLimit) {
 		return admission.Response{
 			AdmissionResponse: admissionv1.AdmissionResponse{
 				Allowed:  true,
@@ -48,14 +74,14 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	return admission.Allowed("ok")
 }
 
-func (v *RatioValidator) getRatio(ctx context.Context, ns string) (*ratio, error) {
-	r := &ratio{}
+func (v *RatioValidator) getRatio(ctx context.Context, ns string) (*Ratio, error) {
+	r := NewRatio()
 	pods := corev1.PodList{}
 	err := v.client.List(ctx, &pods, client.InNamespace(ns))
 	if err != nil {
 		return r, err
 	}
-	return r.recordPod(pods.Items...), nil
+	return r.RecordPod(pods.Items...), nil
 }
 
 // InjectDecoder injects a Admission request decoder

@@ -2,22 +2,24 @@ package webhooks
 
 import (
 	"fmt"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func TestRatio_recordPod(t *testing.T) {
+func TestRatio_Record(t *testing.T) {
 	tcs := map[string]struct {
-		podResources []podResource
+		pods         []podResource
+		deployments  []deployResource
+		statefulsets []deployResource
 		cpuSum       string
 		memorySum    string
 	}{
 		"single container": {
-			podResources: []podResource{
+			pods: []podResource{
 				{
 					{
 						cpu:    "1",
@@ -29,7 +31,7 @@ func TestRatio_recordPod(t *testing.T) {
 			memorySum: "4Gi",
 		},
 		"multi container": {
-			podResources: []podResource{
+			pods: []podResource{
 				{
 					{
 						cpu:    "500m",
@@ -45,7 +47,7 @@ func TestRatio_recordPod(t *testing.T) {
 			memorySum: "5Gi",
 		},
 		"multi pod": {
-			podResources: []podResource{
+			pods: []podResource{
 				{
 					{
 						cpu:    "500m",
@@ -69,36 +71,89 @@ func TestRatio_recordPod(t *testing.T) {
 			cpuSum:    "702m",
 			memorySum: "6245Mi",
 		},
+		"deployments": {
+			deployments: []deployResource{
+				{
+					replicas: 4,
+					containers: []containerResources{
+						{
+							cpu:    "500m",
+							memory: "4Gi",
+						},
+						{
+							cpu:    "101m",
+							memory: "1Gi",
+						},
+					},
+				},
+				{
+					replicas: 2,
+					containers: []containerResources{
+						{
+							cpu:    "250m",
+							memory: "3Gi",
+						},
+					},
+				},
+			},
+			cpuSum:    "2904m",
+			memorySum: "26Gi",
+		},
+		"statefulsets": {
+			deployments: []deployResource{
+				{
+					replicas: 4,
+					containers: []containerResources{
+						{
+							cpu:    "400m",
+							memory: "3Gi",
+						},
+						{
+							cpu:    "101m",
+							memory: "10Mi",
+						},
+					},
+				},
+				{
+					replicas: 2,
+					containers: []containerResources{
+						{
+							cpu:    "250m",
+							memory: "3Gi",
+						},
+					},
+				},
+			},
+			cpuSum:    "2504m",
+			memorySum: "18472Mi",
+		},
 	}
 
 	for k, tc := range tcs {
 		t.Run(k, func(t *testing.T) {
-			var pods []corev1.Pod
 
-			for _, pr := range tc.podResources {
+			r := NewRatio()
+			for _, pr := range tc.pods {
 				pod := corev1.Pod{}
-				for _, cr := range pr {
-					container := corev1.Container{
-						Resources: corev1.ResourceRequirements{
-							Requests: map[corev1.ResourceName]resource.Quantity{},
-						},
-					}
-					if cr.cpu != "" {
-						container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cr.cpu)
-					}
-					if cr.memory != "" {
-						container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(cr.memory)
-					}
-					pod.Spec.Containers = append(pod.Spec.Containers, container)
-				}
-				pods = append(pods, pod)
+				pod.Spec.Containers = newTestContainers(pr)
+				r.RecordPod(pod)
 			}
 
-			r := &ratio{}
-			r.recordPod(pods...)
+			for i := range tc.deployments {
+				deploy := appsv1.Deployment{}
+				deploy.Spec.Replicas = &tc.deployments[i].replicas
+				deploy.Spec.Template.Spec.Containers = newTestContainers(tc.deployments[i].containers)
+				r.RecordDeployment(deploy)
+			}
+			for i := range tc.statefulsets {
+				sts := appsv1.StatefulSet{}
+				sts.Spec.Replicas = &tc.deployments[i].replicas
+				sts.Spec.Template.Spec.Containers = newTestContainers(tc.deployments[i].containers)
+				r.RecordStatefulSet(sts)
+			}
 
-			assertResourceEqual(t, r.cpu, tc.cpuSum)
-			assertResourceEqual(t, r.memory, tc.memorySum)
+			assertResourceEqual(t, resource.NewDecimalQuantity(*r.cpu, resource.BinarySI), tc.cpuSum)
+			assertResourceEqual(t, resource.NewDecimalQuantity(*r.memory, resource.BinarySI), tc.memorySum)
 		})
 	}
 }
@@ -131,7 +186,6 @@ func TestRatio_ratio(t *testing.T) {
 		},
 		{
 			memory:          "5Gi",
-			ratio:           fmt.Sprintf("%d", math.MaxInt64),
 			largerOrEqualTo: "2500Gi",
 		},
 		{
@@ -150,18 +204,20 @@ func TestRatio_ratio(t *testing.T) {
 			if tc.memory != "" {
 				memory = resource.MustParse(tc.memory)
 			}
-			r := ratio{
-				cpu:    &cpu,
-				memory: &memory,
+			r := Ratio{
+				cpu:    cpu.AsDec(),
+				memory: memory.AsDec(),
 			}
-			assertResourceEqual(t, r.ratio(), tc.ratio)
+			if tc.ratio != "" {
+				assertResourceEqual(t, r.Ratio(), tc.ratio)
+				assert.Equalf(t, tc.ratio, r.String(), "should pretty print")
+			}
 			if tc.smallerThan != "" {
-				assert.Truef(t, r.below(resource.MustParse(tc.smallerThan)), "should be smaller than %s", tc.smallerThan)
+				assert.Truef(t, r.Below(resource.MustParse(tc.smallerThan)), "should be smaller than %s", tc.smallerThan)
 			}
 			if tc.largerOrEqualTo != "" {
-				assert.Falsef(t, r.below(resource.MustParse(tc.largerOrEqualTo)), "should not be smaller than %s", tc.largerOrEqualTo)
+				assert.Falsef(t, r.Below(resource.MustParse(tc.largerOrEqualTo)), "should not be smaller than %s", tc.largerOrEqualTo)
 			}
-			assert.Equalf(t, tc.ratio, r.String(), "should pretty print")
 		})
 	}
 }
@@ -170,6 +226,29 @@ func assertResourceEqual(t *testing.T, res *resource.Quantity, s string) bool {
 	return assert.Truef(t, res.Equal(resource.MustParse(s)), "%s should be equal to %s", res, s)
 }
 
+func newTestContainers(res []containerResources) []corev1.Container {
+	var containers []corev1.Container
+	for _, cr := range res {
+		container := corev1.Container{
+			Resources: corev1.ResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{},
+			},
+		}
+		if cr.cpu != "" {
+			container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cr.cpu)
+		}
+		if cr.memory != "" {
+			container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(cr.memory)
+		}
+		containers = append(containers, container)
+	}
+	return containers
+}
+
+type deployResource struct {
+	containers []containerResources
+	replicas   int32
+}
 type podResource []containerResources
 type containerResources struct {
 	cpu    string
