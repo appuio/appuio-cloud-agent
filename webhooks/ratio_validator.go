@@ -71,7 +71,7 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 		return admission.Response{
 			AdmissionResponse: admissionv1.AdmissionResponse{
 				Allowed:  true,
-				Warnings: []string{fmt.Sprintf("Current memory to CPU ratio of %s/core is below the fair use ratio of %s/core", r, v.RatioLimit)},
+				Warnings: []string{fmt.Sprintf("Current memory to CPU ratio of %s/core in this namespace is below the fair use ratio of %s/core\n This might lead to additional cost.", r, v.RatioLimit)},
 			}}
 	}
 	return admission.Allowed("ok")
