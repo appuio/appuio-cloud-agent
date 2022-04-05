@@ -1,0 +1,6 @@
+domain: appuio.io
+layout:
+- go.kubebuilder.io/v3
+projectName: appuio-cloud-agent
+repo: github.com/appuio/appuio-cloud-agent
+version: "3"

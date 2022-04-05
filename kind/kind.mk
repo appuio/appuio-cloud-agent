@@ -2,16 +2,11 @@ kind_dir ?= .kind
 
 .PHONY: kind
 kind: export KUBECONFIG = $(KIND_KUBECONFIG)
-kind: kind-setup-ingress kind-load-image ## All-in-one kind target
+kind: kind-load-image ## All-in-one kind target
 
 .PHONY: kind-setup
 kind-setup: export KUBECONFIG = $(KIND_KUBECONFIG)
 kind-setup: $(KIND_KUBECONFIG) ## Creates the kind cluster
-
-.PHONY: kind-setup-ingress
-kind-setup-ingress: export KUBECONFIG = $(KIND_KUBECONFIG)
-kind-setup-ingress: kind-setup ## Install NGINX as ingress controller onto kind cluster (localhost:8081)
-	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 
 .PHONY: kind-load-image
 kind-load-image: kind-setup build-docker ## Load the container image onto kind cluster
@@ -23,8 +18,13 @@ kind-clean: ## Removes the kind Cluster
 	@$(KIND) delete cluster --name $(KIND_CLUSTER) || true
 	@rm -rf $(kind_dir)
 
+webhook-certs/tls.key:
+	mkdir -p webhook-certs
+	openssl req -x509 -newkey rsa:4096 -nodes -keyout webhook-certs/tls.key -out webhook-certs/tls.crt -days 3650 -subj "/CN=webhook-service.default.svc" -addext "subjectAltName = DNS:webhook-service.default.svc"
+
+
 $(KIND_KUBECONFIG): export KUBECONFIG = $(KIND_KUBECONFIG)
-$(KIND_KUBECONFIG):
+$(KIND_KUBECONFIG): webhook-certs/tls.key
 	$(KIND) create cluster \
 		--name $(KIND_CLUSTER) \
 		--image $(KIND_IMAGE) \
