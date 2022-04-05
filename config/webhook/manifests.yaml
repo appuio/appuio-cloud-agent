@@ -21,7 +21,8 @@ webhooks:
     apiVersions:
     - '*'
     operations:
-    - '*'
+    - CREATE
+    - UPDATE
     resources:
     - '*'
     scope: "Namespaced"
