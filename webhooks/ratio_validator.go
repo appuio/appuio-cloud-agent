@@ -70,8 +70,11 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	if r.Below(*v.RatioLimit) {
 		return admission.Response{
 			AdmissionResponse: admissionv1.AdmissionResponse{
-				Allowed:  true,
-				Warnings: []string{fmt.Sprintf("Current memory to CPU ratio of %s/core in this namespace is below the fair use ratio of %s/core\n This might lead to additional cost.", r, v.RatioLimit)},
+				Allowed: true,
+				// WARNING(glrf) Warnings MUST NOT contain newlines. K8s will simply drop your warning if you add newlines.
+				Warnings: []string{
+					fmt.Sprintf("Current memory to CPU ratio of %s/core in this namespace is below the fair use ratio of %s/core. This might lead to additional costs.", r, v.RatioLimit),
+				},
 			}}
 	}
 	return admission.Allowed("ok")

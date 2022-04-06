@@ -226,6 +226,9 @@ func TestRatioValidator_Handle(t *testing.T) {
 			assert.True(t, resp.Allowed)
 			if tc.warn {
 				assert.NotEmpty(t, resp.AdmissionResponse.Warnings)
+				for _, w := range resp.AdmissionResponse.Warnings {
+					assert.NotContainsf(t, w, "\n", "Warning are not allowed to contain newlines")
+				}
 			} else {
 				assert.Empty(t, resp.AdmissionResponse.Warnings)
 			}
