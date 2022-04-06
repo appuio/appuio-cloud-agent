@@ -29,19 +29,24 @@ type RatioValidator struct {
 
 // Handle handles the admission requests
 func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
+	l := log.FromContext(ctx).
+		WithName("webhook.validate-request-ratio.appuio.io").
+		WithValues("id", req.UID, "user", req.UserInfo.Username).
+		WithValues("namespace", req.Namespace, "name", req.Name, "kind", req.Kind.Kind)
+
 	if strings.HasPrefix(req.UserInfo.Username, "system:") {
 		// Is service account or kube system user: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-subjects
+		l.V(1).Info("allowed: system user")
 		return admission.Allowed("system user")
 	}
 
-	l := log.FromContext(ctx).WithName("webhook.validate-request-ratio.appuio.io")
-	l.V(3).WithValues("kind", req.Kind.Kind, "namespace", req.Namespace).Info("handling request")
-
 	r, err := v.getRatio(ctx, req.Namespace)
 	if err != nil {
+		l.Error(err, "failed to get ratio")
 		return errored(http.StatusInternalServerError, err)
 	}
 
+	l = l.WithValues("current_ratio", r.String())
 	// If we are creating an object with resource requests, we add them to the current ratio
 	// We cannot easily do this when updating resources.
 	if req.Operation == admissionv1.Create {
@@ -49,25 +54,30 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 		case "Pod":
 			pod := corev1.Pod{}
 			if err := v.decoder.Decode(req, &pod); err != nil {
+				l.Error(err, "failed to decode pod")
 				return errored(http.StatusBadRequest, err)
 			}
 			r = r.RecordPod(pod)
 		case "Deployment":
 			deploy := appsv1.Deployment{}
 			if err := v.decoder.Decode(req, &deploy); err != nil {
+				l.Error(err, "failed to decode deployment")
 				return errored(http.StatusBadRequest, err)
 			}
 			r = r.RecordDeployment(deploy)
 		case "StatefulSet":
 			sts := appsv1.StatefulSet{}
 			if err := v.decoder.Decode(req, &sts); err != nil {
+				l.Error(err, "failed to decode statefulset")
 				return errored(http.StatusBadRequest, err)
 			}
 			r = r.RecordStatefulSet(sts)
 		}
 	}
+	l = l.WithValues("ratio", r.String())
 
 	if r.Below(*v.RatioLimit) {
+		l.Info("warned: ratio too low")
 		return admission.Response{
 			AdmissionResponse: admissionv1.AdmissionResponse{
 				Allowed: true,
@@ -77,6 +87,7 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 				},
 			}}
 	}
+	l.V(1).Info("allowed: ratio ok")
 	return admission.Allowed("ok")
 }
 
