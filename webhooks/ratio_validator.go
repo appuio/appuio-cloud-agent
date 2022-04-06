@@ -27,6 +27,9 @@ type RatioValidator struct {
 	RatioLimit *resource.Quantity
 }
 
+// RatioValidatiorDisableAnnotation is the key for an annotion on a namespace to disable request ratio warnings
+var RatioValidatiorDisableAnnotation = "validate-request-ratio.appuio.io/disable"
+
 // Handle handles the admission requests
 func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	l := log.FromContext(ctx).
@@ -40,6 +43,16 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 		return admission.Allowed("system user")
 	}
 
+	disabled, err := v.isNamespaceDisabled(ctx, req.Namespace)
+	if err != nil {
+		l.Error(err, "failed to get namespace")
+		return errored(http.StatusInternalServerError, err)
+	}
+	if disabled {
+		l.V(1).Info("allowed: warning disabled")
+		return admission.Allowed("system user")
+	}
+
 	r, err := v.getRatio(ctx, req.Namespace)
 	if err != nil {
 		l.Error(err, "failed to get ratio")
@@ -50,28 +63,10 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	// If we are creating an object with resource requests, we add them to the current ratio
 	// We cannot easily do this when updating resources.
 	if req.Operation == admissionv1.Create {
-		switch req.Kind.Kind {
-		case "Pod":
-			pod := corev1.Pod{}
-			if err := v.decoder.Decode(req, &pod); err != nil {
-				l.Error(err, "failed to decode pod")
-				return errored(http.StatusBadRequest, err)
-			}
-			r = r.RecordPod(pod)
-		case "Deployment":
-			deploy := appsv1.Deployment{}
-			if err := v.decoder.Decode(req, &deploy); err != nil {
-				l.Error(err, "failed to decode deployment")
-				return errored(http.StatusBadRequest, err)
-			}
-			r = r.RecordDeployment(deploy)
-		case "StatefulSet":
-			sts := appsv1.StatefulSet{}
-			if err := v.decoder.Decode(req, &sts); err != nil {
-				l.Error(err, "failed to decode statefulset")
-				return errored(http.StatusBadRequest, err)
-			}
-			r = r.RecordStatefulSet(sts)
+		r, err = v.recodObject(ctx, r, req)
+		if err != nil {
+			l.Error(err, "failed to record object")
+			return errored(http.StatusBadRequest, err)
 		}
 	}
 	l = l.WithValues("ratio", r.String())
@@ -89,6 +84,46 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	}
 	l.V(1).Info("allowed: ratio ok")
 	return admission.Allowed("ok")
+}
+
+func (v *RatioValidator) recodObject(ctx context.Context, r *Ratio, req admission.Request) (*Ratio, error) {
+	switch req.Kind.Kind {
+	case "Pod":
+		pod := corev1.Pod{}
+		if err := v.decoder.Decode(req, &pod); err != nil {
+			return r, err
+		}
+		r = r.RecordPod(pod)
+	case "Deployment":
+		deploy := appsv1.Deployment{}
+		if err := v.decoder.Decode(req, &deploy); err != nil {
+			return r, err
+		}
+		r = r.RecordDeployment(deploy)
+	case "StatefulSet":
+		sts := appsv1.StatefulSet{}
+		if err := v.decoder.Decode(req, &sts); err != nil {
+			return r, err
+		}
+		r = r.RecordStatefulSet(sts)
+	}
+	return r, nil
+}
+
+func (v *RatioValidator) isNamespaceDisabled(ctx context.Context, nsName string) (bool, error) {
+	ns := corev1.Namespace{}
+	err := v.client.Get(ctx, client.ObjectKey{
+		Name: nsName,
+	}, &ns)
+	if err != nil {
+		return false, err
+	}
+
+	disabled, ok := ns.Annotations[RatioValidatiorDisableAnnotation]
+	if !ok {
+		return false, err
+	}
+	return disabled == "True", nil
 }
 
 func (v *RatioValidator) getRatio(ctx context.Context, ns string) (*Ratio, error) {

@@ -104,13 +104,14 @@ func TestRatioValidator_Handle(t *testing.T) {
 			user:      "bar",
 			namespace: "fail-bar",
 			resources: []client.Object{
+				testNamespace("fail-bar"),
 				podFromResources("pod1", "foo", podResource{
 					{cpu: "100m", memory: "3G"},
 				}),
 				podFromResources("pod2", "foo", podResource{
 					{cpu: "50m", memory: "1Gi"},
 				}),
-				podFromResources("unfair", "bar", podResource{
+				podFromResources("unfair", "fail-bar", podResource{
 					{cpu: "8", memory: "1Gi"},
 				}),
 			},
@@ -242,7 +243,7 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 
 	decoder, err := admission.NewDecoder(scheme)
 	require.NoError(t, err)
-
+	initObjs = append(initObjs, testNamespace("foo"), testNamespace("bar"))
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(initObjs...).
@@ -254,6 +255,14 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 	})
 	uv.InjectDecoder(decoder)
 	return uv
+}
+
+func testNamespace(name string) *corev1.Namespace {
+	return &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
 }
 
 func podFromResources(name, namespace string, res podResource) *corev1.Pod {

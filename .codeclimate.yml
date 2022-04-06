@@ -1,4 +1,9 @@
 version: "2"
+checks:
+  return-statements:
+    enabled: true
+    config:
+      threshold: 8
 plugins:
   shellcheck:
     enabled: true
