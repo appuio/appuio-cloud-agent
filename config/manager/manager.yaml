@@ -25,6 +25,7 @@ spec:
         image: ghcr.io/appuio/appuio-cloud-agent:latest
         ports:
         - containerPort: 9443
+        - containerPort: 8080
         name: agent
         securityContext:
           allowPrivilegeEscalation: false

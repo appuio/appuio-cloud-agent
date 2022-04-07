@@ -1,0 +1,14 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-service
+  namespace: appuio-cloud-agent
+spec:
+  ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+      name: metrics-port
+  selector:
+    control-plane: appuio-cloud-agent
