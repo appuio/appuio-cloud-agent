@@ -22,12 +22,11 @@ var (
 	commit  = "-dirty-"
 	date    = time.Now().Format("2006-01-02")
 
-	// TODO: Adjust app name
 	appName     = "appuio-cloud-agent"
 	appLongName = "agent running on every APPUiO Cloud Zone"
 
 	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	setupLog = ctrl.Log.WithName("setup").WithValues("version", version, "commit", commit, "date", date)
 )
 
 //go:generate go run sigs.k8s.io/controller-tools/cmd/controller-gen object paths="./..."

@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -18,6 +20,7 @@ import (
 )
 
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 
 // RatioValidator checks for every action in a namespace whether the Memory to CPU ratio limit is exceeded and will return a warning if it is.
 type RatioValidator struct {
@@ -26,6 +29,9 @@ type RatioValidator struct {
 
 	RatioLimit *resource.Quantity
 }
+
+// RatioValidatiorDisableAnnotation is the key for an annotion on a namespace to disable request ratio warnings
+var RatioValidatiorDisableAnnotation = "validate-request-ratio.appuio.io/disable"
 
 // Handle handles the admission requests
 func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
@@ -40,6 +46,19 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 		return admission.Allowed("system user")
 	}
 
+	disabled, err := v.isNamespaceDisabled(ctx, req.Namespace)
+	if err != nil {
+		l.Error(err, "failed to get namespace")
+		if apierrors.IsNotFound(err) {
+			return errored(http.StatusNotFound, err)
+		}
+		return errored(http.StatusInternalServerError, err)
+	}
+	if disabled {
+		l.V(1).Info("allowed: warning disabled")
+		return admission.Allowed("system user")
+	}
+
 	r, err := v.getRatio(ctx, req.Namespace)
 	if err != nil {
 		l.Error(err, "failed to get ratio")
@@ -50,28 +69,10 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	// If we are creating an object with resource requests, we add them to the current ratio
 	// We cannot easily do this when updating resources.
 	if req.Operation == admissionv1.Create {
-		switch req.Kind.Kind {
-		case "Pod":
-			pod := corev1.Pod{}
-			if err := v.decoder.Decode(req, &pod); err != nil {
-				l.Error(err, "failed to decode pod")
-				return errored(http.StatusBadRequest, err)
-			}
-			r = r.RecordPod(pod)
-		case "Deployment":
-			deploy := appsv1.Deployment{}
-			if err := v.decoder.Decode(req, &deploy); err != nil {
-				l.Error(err, "failed to decode deployment")
-				return errored(http.StatusBadRequest, err)
-			}
-			r = r.RecordDeployment(deploy)
-		case "StatefulSet":
-			sts := appsv1.StatefulSet{}
-			if err := v.decoder.Decode(req, &sts); err != nil {
-				l.Error(err, "failed to decode statefulset")
-				return errored(http.StatusBadRequest, err)
-			}
-			r = r.RecordStatefulSet(sts)
+		r, err = v.recordObject(ctx, r, req)
+		if err != nil {
+			l.Error(err, "failed to record object")
+			return errored(http.StatusBadRequest, err)
 		}
 	}
 	l = l.WithValues("ratio", r.String())
@@ -89,6 +90,46 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	}
 	l.V(1).Info("allowed: ratio ok")
 	return admission.Allowed("ok")
+}
+
+func (v *RatioValidator) recordObject(ctx context.Context, r *Ratio, req admission.Request) (*Ratio, error) {
+	switch req.Kind.Kind {
+	case "Pod":
+		pod := corev1.Pod{}
+		if err := v.decoder.Decode(req, &pod); err != nil {
+			return r, err
+		}
+		r = r.RecordPod(pod)
+	case "Deployment":
+		deploy := appsv1.Deployment{}
+		if err := v.decoder.Decode(req, &deploy); err != nil {
+			return r, err
+		}
+		r = r.RecordDeployment(deploy)
+	case "StatefulSet":
+		sts := appsv1.StatefulSet{}
+		if err := v.decoder.Decode(req, &sts); err != nil {
+			return r, err
+		}
+		r = r.RecordStatefulSet(sts)
+	}
+	return r, nil
+}
+
+func (v *RatioValidator) isNamespaceDisabled(ctx context.Context, nsName string) (bool, error) {
+	ns := corev1.Namespace{}
+	err := v.client.Get(ctx, client.ObjectKey{
+		Name: nsName,
+	}, &ns)
+	if err != nil {
+		return false, err
+	}
+
+	disabled, ok := ns.Annotations[RatioValidatiorDisableAnnotation]
+	if !ok {
+		return false, nil
+	}
+	return strconv.ParseBool(disabled)
 }
 
 func (v *RatioValidator) getRatio(ctx context.Context, ns string) (*Ratio, error) {
