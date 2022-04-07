@@ -126,7 +126,7 @@ func (v *RatioValidator) isNamespaceDisabled(ctx context.Context, nsName string)
 
 	disabled, ok := ns.Annotations[RatioValidatiorDisableAnnotation]
 	if !ok {
-		return false, err
+		return false, nil
 	}
 	return strconv.ParseBool(disabled)
 }
