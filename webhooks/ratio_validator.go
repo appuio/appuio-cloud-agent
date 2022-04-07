@@ -68,7 +68,7 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	// If we are creating an object with resource requests, we add them to the current ratio
 	// We cannot easily do this when updating resources.
 	if req.Operation == admissionv1.Create {
-		r, err = v.recodObject(ctx, r, req)
+		r, err = v.recordObject(ctx, r, req)
 		if err != nil {
 			l.Error(err, "failed to record object")
 			return errored(http.StatusBadRequest, err)
@@ -91,7 +91,7 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	return admission.Allowed("ok")
 }
 
-func (v *RatioValidator) recodObject(ctx context.Context, r *Ratio, req admission.Request) (*Ratio, error) {
+func (v *RatioValidator) recordObject(ctx context.Context, r *Ratio, req admission.Request) (*Ratio, error) {
 	switch req.Kind.Kind {
 	case "Pod":
 		pod := corev1.Pod{}
