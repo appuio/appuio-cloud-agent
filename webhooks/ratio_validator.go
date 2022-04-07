@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -46,6 +48,9 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 	disabled, err := v.isNamespaceDisabled(ctx, req.Namespace)
 	if err != nil {
 		l.Error(err, "failed to get namespace")
+		if apierrors.IsNotFound(err) {
+			return errored(http.StatusNotFound, err)
+		}
 		return errored(http.StatusInternalServerError, err)
 	}
 	if disabled {
@@ -123,7 +128,7 @@ func (v *RatioValidator) isNamespaceDisabled(ctx context.Context, nsName string)
 	if !ok {
 		return false, err
 	}
-	return disabled == "True", nil
+	return strconv.ParseBool(disabled)
 }
 
 func (v *RatioValidator) getRatio(ctx context.Context, ns string) (*Ratio, error) {

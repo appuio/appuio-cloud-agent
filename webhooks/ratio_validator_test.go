@@ -83,6 +83,29 @@ func TestRatioValidator_Handle(t *testing.T) {
 			limit: "1Gi",
 			warn:  true,
 		},
+		"Allow_DisabledUnfairNamespace": {
+			user:      "appuio#foo",
+			namespace: "disabled-foo",
+			resources: []client.Object{
+				podFromResources("unfair", "disabled-foo", podResource{
+					{cpu: "8", memory: "1Gi"},
+				}),
+			},
+			limit: "1Gi",
+			warn:  false,
+		},
+		"Allow_LowercaseDisabledUnfairNamespace": {
+			user:      "appuio#foo",
+			namespace: "disabled-bar",
+			resources: []client.Object{
+				podFromResources("unfair", "disabled-bar", podResource{
+					{cpu: "8", memory: "1Gi"},
+				}),
+			},
+			limit: "1Gi",
+			warn:  false,
+		},
+
 		"Allow_ServiceAccount": {
 			user:      "system:serviceaccount:bar",
 			namespace: "bar",
@@ -120,6 +143,16 @@ func TestRatioValidator_Handle(t *testing.T) {
 			fail:       true,
 			statusCode: http.StatusInternalServerError,
 		},
+		"NamespaceNotExists": {
+			user:       "bar",
+			namespace:  "notexits",
+			resources:  []client.Object{},
+			limit:      "1Gi",
+			warn:       false,
+			fail:       true,
+			statusCode: http.StatusNotFound,
+		},
+
 		"Warn_ConsiderNewPod": {
 			user:      "appuio#foo",
 			namespace: "foo",
@@ -243,7 +276,21 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 
 	decoder, err := admission.NewDecoder(scheme)
 	require.NoError(t, err)
-	initObjs = append(initObjs, testNamespace("foo"), testNamespace("bar"))
+	barNs := testNamespace("bar")
+	barNs.Annotations = map[string]string{
+		RatioValidatiorDisableAnnotation: "False",
+	}
+
+	disabledNs := testNamespace("disabled-foo")
+	disabledNs.Annotations = map[string]string{
+		RatioValidatiorDisableAnnotation: "True",
+	}
+	otherDisabledNs := testNamespace("disabled-bar")
+	otherDisabledNs.Annotations = map[string]string{
+		RatioValidatiorDisableAnnotation: "true",
+	}
+
+	initObjs = append(initObjs, testNamespace("foo"), barNs, disabledNs, otherDisabledNs)
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(initObjs...).
