@@ -2,9 +2,9 @@ package controllers
 
 import (
 	"context"
-	"strconv"
+	"errors"
 
-	"github.com/appuio/appuio-cloud-agent/webhooks"
+	"github.com/appuio/appuio-cloud-agent/ratio"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 
@@ -21,70 +21,69 @@ type RatioReconciler struct {
 	Recorder record.EventRecorder
 	Scheme   *runtime.Scheme
 
-	RatioLimit        *resource.Quantity
-  OrganizationLabel string
+	Ratio      ratioFetcher
+	RatioLimit *resource.Quantity
+}
+
+type ratioFetcher interface {
+	FetchRatio(ctx context.Context, ns string) (*ratio.Ratio, error)
 }
 
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
 var eventReason = "TooMuchCPURequest"
-var eventMessage = "Memory to CPU ratio of %s/core in this namespace is low"
 
-// Reconcile
+// Reconcile reacts to pod updates and emits events if the fair use request ratio is violated
 func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx).WithValues("namespace", req.Namespace, "name", req.Name)
 
-	ns := corev1.Namespace{}
-	err := r.Get(ctx, client.ObjectKey{
-		Name: req.Namespace,
-	}, &ns)
+	nsRatio, err := r.Ratio.FetchRatio(ctx, req.Namespace)
 	if err != nil {
-		l.Error(err, "failed to get namespace")
-		return ctrl.Result{}, err
-	}
-
-	if _, ok := ns.Labels[r.OrganizationLabel]; !ok {
-		l.V(1).Info("namespace ignored")
-		return ctrl.Result{}, nil
-	}
-	disabled, ok := ns.Annotations[webhooks.RatioValidatiorDisableAnnotation]
-	if ok {
-		d, err := strconv.ParseBool(disabled)
-		if err == nil && d {
-			l.V(1).Info("warnings disabled")
+		if errors.Is(err, ratio.ErrorDisabled) {
+			l.V(1).Info("namespace disabled")
 			return ctrl.Result{}, nil
 		}
-	}
-
-	ratio, err := r.getRatio(ctx, req.Namespace)
-	if err != nil {
+		l.Error(err, "failed to get ratio")
 		return ctrl.Result{}, err
 	}
-	l = l.WithValues("ratio", ratio.String())
 
-	if ratio.Below(*r.RatioLimit) {
+	if nsRatio.Below(*r.RatioLimit) {
 		l.Info("recording warn event: ratio too low")
-		pod := corev1.Pod{}
-		err := r.Get(ctx, req.NamespacedName, &pod)
-		if err != nil {
-			l.Error(err, "failed to get pod")
-			return ctrl.Result{}, err
+
+		if err := r.warnPod(ctx, req.Name, req.Namespace, nsRatio); err != nil {
+			l.Error(err, "failed to record event on pod")
 		}
-		r.Recorder.Eventf(&ns, "Warning", eventReason, eventMessage, ratio.String())
-		r.Recorder.Eventf(&pod, "Warning", eventReason, eventMessage, ratio.String())
+		if err := r.warnNamespace(ctx, req.Namespace, nsRatio); err != nil {
+			l.Error(err, "failed to record event on namespace")
+		}
 	}
 
 	return ctrl.Result{}, nil
 }
-func (r *RatioReconciler) getRatio(ctx context.Context, ns string) (*webhooks.Ratio, error) {
-	ratio := webhooks.NewRatio()
-	pods := corev1.PodList{}
-	err := r.List(ctx, &pods, client.InNamespace(ns))
+
+func (r *RatioReconciler) warnPod(ctx context.Context, name, namespace string, nsRatio *ratio.Ratio) error {
+	pod := corev1.Pod{}
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, &pod)
 	if err != nil {
-		return ratio, err
+		return err
 	}
-	return ratio.RecordPod(pods.Items...), nil
+	r.Recorder.Event(&pod, "Warning", eventReason, nsRatio.Warn(r.RatioLimit))
+	return nil
+}
+func (r *RatioReconciler) warnNamespace(ctx context.Context, name string, nsRatio *ratio.Ratio) error {
+	ns := corev1.Namespace{}
+	err := r.Get(ctx, client.ObjectKey{
+		Name: name,
+	}, &ns)
+	if err != nil {
+		return err
+	}
+	r.Recorder.Event(&ns, "Warning", eventReason, nsRatio.Warn(r.RatioLimit))
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

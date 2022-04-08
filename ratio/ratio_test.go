@@ -1,4 +1,4 @@
-package webhooks
+package ratio
 
 import (
 	"fmt"

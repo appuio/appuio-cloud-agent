@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/appuio/appuio-cloud-agent/controllers"
+	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
 )
 
@@ -80,15 +81,21 @@ func main() {
 	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
 		Handler: &webhooks.RatioValidator{
 			RatioLimit: &limit,
+			Ratio: &ratio.RatioFetcher{
+				Client: mgr.GetClient(),
+			},
 		},
 	})
 
 	if err = (&controllers.RatioReconciler{
-		Client:            mgr.GetClient(),
-		Recorder:          mgr.GetEventRecorderFor("resource-ratio-controller"),
-		Scheme:            mgr.GetScheme(),
-		RatioLimit:        &limit,
-		OrganizationLabel: *organizationLabel,
+		Client:     mgr.GetClient(),
+		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
+		Scheme:     mgr.GetScheme(),
+		RatioLimit: &limit,
+		Ratio: &ratio.RatioFetcher{
+			Client:            mgr.GetClient(),
+			OrganizationLabel: *organizationLabel,
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ratio")
 		os.Exit(1)

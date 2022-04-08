@@ -1,12 +1,64 @@
-package webhooks
+package ratio
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"strconv"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	inf "gopkg.in/inf.v0"
 )
+
+// RatioValidatiorDisableAnnotation is the key for an annotion on a namespace to disable request ratio warnings
+var RatioValidatiorDisableAnnotation = "validate-request-ratio.appuio.io/disable"
+
+// ErrorDisabled is returned if the request ratio validation is disabled
+var ErrorDisabled error = errors.New("request ratio validation disabled")
+
+// RatioFetcher collects the CPU to memory request ratio
+type RatioFetcher struct {
+	Client client.Client
+
+	OrganizationLabel string
+}
+
+// FetchRatio collects the CPU to memory request ratio for the given namespace
+func (f RatioFetcher) FetchRatio(ctx context.Context, name string) (*Ratio, error) {
+	ns := corev1.Namespace{}
+	err := f.Client.Get(ctx, client.ObjectKey{
+		Name: name,
+	}, &ns)
+	if err != nil {
+		return nil, err
+	}
+
+	disabledAnnot, ok := ns.Annotations[RatioValidatiorDisableAnnotation]
+	if ok {
+		disabled, err := strconv.ParseBool(disabledAnnot)
+		if err != nil || disabled {
+			return nil, ErrorDisabled
+		}
+	}
+
+	if f.OrganizationLabel != "" {
+		if _, isOrgNs := ns.Labels[f.OrganizationLabel]; !isOrgNs {
+			return nil, ErrorDisabled
+		}
+	}
+
+	r := NewRatio()
+	pods := corev1.PodList{}
+	err = f.Client.List(ctx, &pods, client.InNamespace(name))
+	if err != nil {
+		return r, err
+	}
+	return r.RecordPod(pods.Items...), nil
+}
 
 // Ratio records resource requests and can calculate the current memory to CPU request ratio
 type Ratio struct {
@@ -87,4 +139,14 @@ func (r Ratio) Below(limit resource.Quantity) bool {
 // String implements Stringer to print ratio
 func (r Ratio) String() string {
 	return r.Ratio().String()
+}
+
+// Warn returns a warning string explaining that the ratio is not considered fair use
+func (r Ratio) Warn(limit *resource.Quantity) string {
+	// WARNING(glrf) Warnings MUST NOT contain newlines. K8s will simply drop your warning if you add newlines.
+	w := fmt.Sprintf("Current memory to CPU ratio of %s/core in this namespace is below the fair use ratio", r)
+	if limit != nil {
+		w = fmt.Sprintf("%s of %s/core", w, limit)
+	}
+	return w
 }

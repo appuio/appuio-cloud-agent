@@ -21,6 +21,7 @@ import (
 
 	"testing"
 
+	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -250,6 +251,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 
 			resp := v.Handle(ctx, ar)
 			if tc.fail {
+				require.NotNil(t, resp.AdmissionResponse.Result)
 				assert.Equal(t, tc.statusCode, resp.AdmissionResponse.Result.Code)
 				assert.True(t, resp.Allowed)
 				return
@@ -278,16 +280,16 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 	require.NoError(t, err)
 	barNs := testNamespace("bar")
 	barNs.Annotations = map[string]string{
-		RatioValidatiorDisableAnnotation: "False",
+		ratio.RatioValidatiorDisableAnnotation: "False",
 	}
 
 	disabledNs := testNamespace("disabled-foo")
 	disabledNs.Annotations = map[string]string{
-		RatioValidatiorDisableAnnotation: "True",
+		ratio.RatioValidatiorDisableAnnotation: "True",
 	}
 	otherDisabledNs := testNamespace("disabled-bar")
 	otherDisabledNs.Annotations = map[string]string{
-		RatioValidatiorDisableAnnotation: "true",
+		ratio.RatioValidatiorDisableAnnotation: "true",
 	}
 
 	initObjs = append(initObjs, testNamespace("foo"), barNs, disabledNs, otherDisabledNs)
@@ -296,10 +298,11 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 		WithObjects(initObjs...).
 		Build()
 
-	uv := &RatioValidator{}
-	uv.InjectClient(failingClient{
-		WithWatch: client,
-	})
+	uv := &RatioValidator{
+		Ratio: ratio.RatioFetcher{
+			Client: failingClient{client},
+		},
+	}
 	uv.InjectDecoder(decoder)
 	return uv
 }
@@ -370,6 +373,35 @@ func statefulsetFromResources(name, namespace string, replicas int32, res podRes
 	sts.Spec.Replicas = &replicas
 	sts.Spec.Template.Spec.Containers = newTestContainers(res)
 	return &sts
+}
+
+func newTestContainers(res []containerResources) []corev1.Container {
+	var containers []corev1.Container
+	for _, cr := range res {
+		container := corev1.Container{
+			Resources: corev1.ResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{},
+			},
+		}
+		if cr.cpu != "" {
+			container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cr.cpu)
+		}
+		if cr.memory != "" {
+			container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(cr.memory)
+		}
+		containers = append(containers, container)
+	}
+	return containers
+}
+
+type deployResource struct {
+	containers []containerResources
+	replicas   int32
+}
+type podResource []containerResources
+type containerResources struct {
+	cpu    string
+	memory string
 }
 
 type failingClient struct {
