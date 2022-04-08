@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/appuio/appuio-cloud-agent/webhooks"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -14,6 +13,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/appuio/appuio-cloud-agent/controllers"
+	"github.com/appuio/appuio-cloud-agent/webhooks"
 )
 
 var (
@@ -47,6 +49,8 @@ func main() {
 	webhookPort := flag.Int("webhook-port", 9443, "The port on which the admission webhooks are served")
 
 	memoryCPURatio := flag.String("memory-per-core-limit", "4Gi", "The fair use limit of memory usage per CPU core")
+	organizationLabel := flag.String("organization-label", "appuio.io/organization", "The label used to mark namespaces to belong to an organization")
+
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -79,6 +83,16 @@ func main() {
 		},
 	})
 
+	if err = (&controllers.RatioReconciler{
+		Client:            mgr.GetClient(),
+		Recorder:          mgr.GetEventRecorderFor("resource-ratio-controller"),
+		Scheme:            mgr.GetScheme(),
+		RatioLimit:        &limit,
+		OrganizationLabel: *organizationLabel,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ratio")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

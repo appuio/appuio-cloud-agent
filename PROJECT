@@ -3,4 +3,8 @@ layout:
 - go.kubebuilder.io/v3
 projectName: appuio-cloud-agent
 repo: github.com/appuio/appuio-cloud-agent
+resources:
+- controller: true
+  kind: Pod
+  version: v1
 version: "3"
