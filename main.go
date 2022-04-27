@@ -81,7 +81,7 @@ func main() {
 	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
 		Handler: &webhooks.RatioValidator{
 			RatioLimit: &limit,
-			Ratio: &ratio.RatioFetcher{
+			Ratio: &ratio.Fetcher{
 				Client: mgr.GetClient(),
 			},
 		},
@@ -92,7 +92,7 @@ func main() {
 		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
 		Scheme:     mgr.GetScheme(),
 		RatioLimit: &limit,
-		Ratio: &ratio.RatioFetcher{
+		Ratio: &ratio.Fetcher{
 			Client:            mgr.GetClient(),
 			OrganizationLabel: *organizationLabel,
 		},

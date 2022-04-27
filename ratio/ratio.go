@@ -20,15 +20,15 @@ var RatioValidatiorDisableAnnotation = "validate-request-ratio.appuio.io/disable
 // ErrorDisabled is returned if the request ratio validation is disabled
 var ErrorDisabled error = errors.New("request ratio validation disabled")
 
-// RatioFetcher collects the CPU to memory request ratio
-type RatioFetcher struct {
+// Fetcher collects the CPU to memory request ratio
+type Fetcher struct {
 	Client client.Client
 
 	OrganizationLabel string
 }
 
 // FetchRatio collects the CPU to memory request ratio for the given namespace
-func (f RatioFetcher) FetchRatio(ctx context.Context, name string) (*Ratio, error) {
+func (f Fetcher) FetchRatio(ctx context.Context, name string) (*Ratio, error) {
 	ns := corev1.Namespace{}
 	err := f.Client.Get(ctx, client.ObjectKey{
 		Name: name,
@@ -144,7 +144,7 @@ func (r Ratio) String() string {
 // Warn returns a warning string explaining that the ratio is not considered fair use
 func (r Ratio) Warn(limit *resource.Quantity) string {
 	// WARNING(glrf) Warnings MUST NOT contain newlines. K8s will simply drop your warning if you add newlines.
-	w := fmt.Sprintf("Current memory to CPU ratio of %s/core in this namespace is below the fair use ratio", r)
+	w := fmt.Sprintf("Current memory to CPU ratio of %s/core in this namespace is below the fair use ratio", r.String())
 	if limit != nil {
 		w = fmt.Sprintf("%s of %s/core", w, limit)
 	}

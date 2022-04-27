@@ -299,7 +299,7 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 		Build()
 
 	uv := &RatioValidator{
-		Ratio: ratio.RatioFetcher{
+		Ratio: ratio.Fetcher{
 			Client: failingClient{client},
 		},
 	}

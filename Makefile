@@ -37,6 +37,10 @@ run:
 .PHONY: test
 test: test-go ## All-in-one test
 
+.PHONY: fuzz
+fuzz:
+	go test ./ratio -fuzztime 1m -fuzz .
+
 .PHONY: test-go
 test-go: ## Run unit tests against code
 	go test -race -coverprofile cover.out -covermode atomic ./...

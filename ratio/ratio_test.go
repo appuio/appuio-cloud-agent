@@ -222,6 +222,38 @@ func TestRatio_ratio(t *testing.T) {
 	}
 }
 
+func TestRatio_Warn(t *testing.T) {
+	cpu := resource.MustParse("1")
+	memory := resource.MustParse("1024Mi")
+	r := Ratio{
+		cpu:    cpu.AsDec(),
+		memory: memory.AsDec(),
+	}
+	assert.Contains(t, r.Warn(nil), "1Gi")
+	lim := resource.MustParse("1Mi")
+	assert.Contains(t, r.Warn(&lim), "1Mi")
+}
+
+func FuzzRatio(f *testing.F) {
+	f.Add(1, 1024, 512)
+	f.Fuzz(func(t *testing.T, cpu int, memory int, limit int) {
+		assert.NotPanics(t, func() {
+			t.Logf("Input: \n\tCPU: %d, Memory: %d, Limit: %d", cpu, memory, limit)
+			cpuQuant := resource.MustParse(fmt.Sprintf("%dm", cpu))
+			memQuant := resource.MustParse(fmt.Sprintf("%dMi", memory))
+			r := Ratio{
+				cpu:    cpuQuant.AsDec(),
+				memory: memQuant.AsDec(),
+			}
+			lim := resource.MustParse(fmt.Sprintf("%dMi", limit))
+			out := r.Warn(&lim)
+			assert.NotEmpty(t, out)
+
+			r.Below(lim)
+		})
+	})
+}
+
 func assertResourceEqual(t *testing.T, res *resource.Quantity, s string) bool {
 	return assert.Truef(t, res.Equal(resource.MustParse(s)), "%s should be equal to %s", res, s)
 }
