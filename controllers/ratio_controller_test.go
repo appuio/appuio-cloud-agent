@@ -116,7 +116,7 @@ func TestRatioReconciler_RecordFailed(t *testing.T) {
 		limit:       resource.MustParse("4G"),
 		fetchMemory: resource.MustParse("4G"),
 		fetchCPU:    resource.MustParse("1100m"),
-		recorder: recorder,
+		recorder:    recorder,
 		obj: []client.Object{
 			&wrongNs,
 			&wrongPod,
@@ -129,11 +129,11 @@ func TestRatioReconciler_RecordFailed(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	if !assert.Len(t, recorder.Events, 0) {
-    for i := 0; i < len(recorder.Events); i++ {
-      e := <- recorder.Events
-      t.Log(e)
-    }
-  }
+		for i := 0; i < len(recorder.Events); i++ {
+			e := <-recorder.Events
+			t.Log(e)
+		}
+	}
 }
 
 type testCfg struct {

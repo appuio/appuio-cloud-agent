@@ -33,15 +33,16 @@ import (
 func TestRatioValidator_Handle(t *testing.T) {
 	ctx := context.Background()
 	tests := map[string]struct {
-		user       string
-		namespace  string
-		resources  []client.Object
-		object     client.Object
-		create     bool
-		limit      string
-		warn       bool
-		fail       bool
-		statusCode int32
+		user         string
+		namespace    string
+		resources    []client.Object
+		object       client.Object
+		mangleObject bool
+		create       bool
+		limit        string
+		warn         bool
+		fail         bool
+		statusCode   int32
 	}{
 
 		"Allow_EmptyNamespace": {
@@ -172,6 +173,20 @@ func TestRatioValidator_Handle(t *testing.T) {
 			warn:   true,
 			create: true,
 		},
+		"Warn_FailMangledPod": {
+			user:      "appuio#foo",
+			namespace: "foo",
+			resources: []client.Object{},
+			object: podFromResources("unfair", "foo", podResource{
+				{cpu: "8", memory: "1Gi"},
+			}),
+			mangleObject: true,
+			limit:        "4Gi",
+			warn:         false,
+			create:       true,
+			fail:         true,
+			statusCode:   http.StatusBadRequest,
+		},
 		"Warn_ConsiderNewDeployment": {
 			user:      "appuio#foo",
 			namespace: "foo",
@@ -187,6 +202,18 @@ func TestRatioValidator_Handle(t *testing.T) {
 			warn:   true,
 			create: true,
 		},
+		"Warn_FailMangledDeployment": {
+			user:         "appuio#foo",
+			namespace:    "foo",
+			resources:    []client.Object{},
+			object:       deploymentFromResources("unfair", "foo", 2, podResource{}),
+			mangleObject: true,
+			limit:        "4Gi",
+			warn:         false,
+			create:       true,
+			fail:         true,
+			statusCode:   http.StatusBadRequest,
+		},
 		"Warn_ConsiderNewStatefulset": {
 			user:      "appuio#foo",
 			namespace: "foo",
@@ -201,6 +228,18 @@ func TestRatioValidator_Handle(t *testing.T) {
 			limit:  "4Gi",
 			warn:   true,
 			create: true,
+		},
+		"Warn_FailMangledSts": {
+			user:         "appuio#foo",
+			namespace:    "foo",
+			resources:    []client.Object{},
+			object:       statefulsetFromResources("unfair", "foo", 2, podResource{}),
+			mangleObject: true,
+			limit:        "4Gi",
+			warn:         false,
+			create:       true,
+			fail:         true,
+			statusCode:   http.StatusBadRequest,
 		},
 	}
 
@@ -239,6 +278,9 @@ func TestRatioValidator_Handle(t *testing.T) {
 
 				raw, err := json.Marshal(tc.object)
 				require.NoError(t, err)
+				if tc.mangleObject {
+					raw = []byte("?invalid")
+				}
 
 				ar.AdmissionRequest.Object = runtime.RawExtension{
 					Raw: raw,
