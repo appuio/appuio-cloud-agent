@@ -100,7 +100,7 @@ func TestRatio_Record(t *testing.T) {
 			memorySum: "26Gi",
 		},
 		"statefulsets": {
-			deployments: []deployResource{
+			statefulsets: []deployResource{
 				{
 					replicas: 4,
 					containers: []containerResources{
@@ -147,13 +147,13 @@ func TestRatio_Record(t *testing.T) {
 			}
 			for i := range tc.statefulsets {
 				sts := appsv1.StatefulSet{}
-				sts.Spec.Replicas = &tc.deployments[i].replicas
-				sts.Spec.Template.Spec.Containers = newTestContainers(tc.deployments[i].containers)
+				sts.Spec.Replicas = &tc.statefulsets[i].replicas
+				sts.Spec.Template.Spec.Containers = newTestContainers(tc.statefulsets[i].containers)
 				r.RecordStatefulSet(sts)
 			}
 
-			assertResourceEqual(t, resource.NewDecimalQuantity(*r.cpu, resource.BinarySI), tc.cpuSum)
-			assertResourceEqual(t, resource.NewDecimalQuantity(*r.memory, resource.BinarySI), tc.memorySum)
+			assertResourceEqual(t, resource.NewDecimalQuantity(*r.CPU, resource.BinarySI), tc.cpuSum)
+			assertResourceEqual(t, resource.NewDecimalQuantity(*r.Memory, resource.BinarySI), tc.memorySum)
 		})
 	}
 }
@@ -205,8 +205,8 @@ func TestRatio_ratio(t *testing.T) {
 				memory = resource.MustParse(tc.memory)
 			}
 			r := Ratio{
-				cpu:    cpu.AsDec(),
-				memory: memory.AsDec(),
+				CPU:    cpu.AsDec(),
+				Memory: memory.AsDec(),
 			}
 			if tc.ratio != "" {
 				assertResourceEqual(t, r.Ratio(), tc.ratio)
@@ -226,8 +226,8 @@ func TestRatio_Warn(t *testing.T) {
 	cpu := resource.MustParse("1")
 	memory := resource.MustParse("1024Mi")
 	r := Ratio{
-		cpu:    cpu.AsDec(),
-		memory: memory.AsDec(),
+		CPU:    cpu.AsDec(),
+		Memory: memory.AsDec(),
 	}
 	assert.Contains(t, r.Warn(nil), "1Gi")
 	lim := resource.MustParse("1Mi")
@@ -242,8 +242,8 @@ func FuzzRatio(f *testing.F) {
 			cpuQuant := resource.MustParse(fmt.Sprintf("%dm", cpu))
 			memQuant := resource.MustParse(fmt.Sprintf("%dMi", memory))
 			r := Ratio{
-				cpu:    cpuQuant.AsDec(),
-				memory: memQuant.AsDec(),
+				CPU:    cpuQuant.AsDec(),
+				Memory: memQuant.AsDec(),
 			}
 			lim := resource.MustParse(fmt.Sprintf("%dMi", limit))
 			out := r.Warn(&lim)
@@ -252,37 +252,4 @@ func FuzzRatio(f *testing.F) {
 			r.Below(lim)
 		})
 	})
-}
-
-func assertResourceEqual(t *testing.T, res *resource.Quantity, s string) bool {
-	return assert.Truef(t, res.Equal(resource.MustParse(s)), "%s should be equal to %s", res, s)
-}
-
-func newTestContainers(res []containerResources) []corev1.Container {
-	var containers []corev1.Container
-	for _, cr := range res {
-		container := corev1.Container{
-			Resources: corev1.ResourceRequirements{
-				Requests: map[corev1.ResourceName]resource.Quantity{},
-			},
-		}
-		if cr.cpu != "" {
-			container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cr.cpu)
-		}
-		if cr.memory != "" {
-			container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(cr.memory)
-		}
-		containers = append(containers, container)
-	}
-	return containers
-}
-
-type deployResource struct {
-	containers []containerResources
-	replicas   int32
-}
-type podResource []containerResources
-type containerResources struct {
-	cpu    string
-	memory string
 }

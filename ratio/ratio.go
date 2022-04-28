@@ -1,76 +1,26 @@
 package ratio
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	inf "gopkg.in/inf.v0"
 )
 
-// RatioValidatiorDisableAnnotation is the key for an annotion on a namespace to disable request ratio warnings
-var RatioValidatiorDisableAnnotation = "validate-request-ratio.appuio.io/disable"
-
-// ErrorDisabled is returned if the request ratio validation is disabled
-var ErrorDisabled error = errors.New("request ratio validation disabled")
-
-// Fetcher collects the CPU to memory request ratio
-type Fetcher struct {
-	Client client.Client
-
-	OrganizationLabel string
-}
-
-// FetchRatio collects the CPU to memory request ratio for the given namespace
-func (f Fetcher) FetchRatio(ctx context.Context, name string) (*Ratio, error) {
-	ns := corev1.Namespace{}
-	err := f.Client.Get(ctx, client.ObjectKey{
-		Name: name,
-	}, &ns)
-	if err != nil {
-		return nil, err
-	}
-
-	disabledAnnot, ok := ns.Annotations[RatioValidatiorDisableAnnotation]
-	if ok {
-		disabled, err := strconv.ParseBool(disabledAnnot)
-		if err != nil || disabled {
-			return nil, ErrorDisabled
-		}
-	}
-
-	if f.OrganizationLabel != "" {
-		if _, isOrgNs := ns.Labels[f.OrganizationLabel]; !isOrgNs {
-			return nil, ErrorDisabled
-		}
-	}
-
-	r := NewRatio()
-	pods := corev1.PodList{}
-	err = f.Client.List(ctx, &pods, client.InNamespace(name))
-	if err != nil {
-		return r, err
-	}
-	return r.RecordPod(pods.Items...), nil
-}
-
 // Ratio records resource requests and can calculate the current memory to CPU request ratio
 type Ratio struct {
-	cpu    *inf.Dec
-	memory *inf.Dec
+	CPU    *inf.Dec
+	Memory *inf.Dec
 }
 
 // NewRatio returns an initialized Ratio
 func NewRatio() *Ratio {
 	return &Ratio{
-		cpu:    &inf.Dec{},
-		memory: &inf.Dec{},
+		CPU:    &inf.Dec{},
+		Memory: &inf.Dec{},
 	}
 }
 
@@ -83,8 +33,8 @@ func (r *Ratio) recordReplicatedPodSpec(replicas int32, spec corev1.PodSpec) *Ra
 	}
 	rep := inf.NewDec(int64(replicas), 0)
 
-	r.cpu.Add(r.cpu, cpu.Mul(cpu, rep))
-	r.memory.Add(r.memory, mem.Mul(mem, rep))
+	r.CPU.Add(r.CPU, cpu.Mul(cpu, rep))
+	r.Memory.Add(r.Memory, mem.Mul(mem, rep))
 	return r
 }
 
@@ -123,10 +73,10 @@ func (r *Ratio) RecordStatefulSet(stss ...appsv1.StatefulSet) *Ratio {
 // Ratio returns the memory to CPU ratio of the recorded objects.
 // Returns nil if there are no CPU requests.
 func (r Ratio) Ratio() *resource.Quantity {
-	if r.cpu.Cmp(inf.NewDec(0, 0)) <= 0 {
+	if r.CPU.Cmp(inf.NewDec(0, 0)) <= 0 {
 		return nil
 	}
-	rDec := inf.NewDec(0, 0).QuoRound(r.memory, r.cpu, 0, inf.RoundHalfEven)
+	rDec := inf.NewDec(0, 0).QuoRound(r.Memory, r.CPU, 0, inf.RoundHalfEven)
 	return resource.NewDecimalQuantity(*rDec, resource.BinarySI)
 }
 
