@@ -73,34 +73,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	limit, err := resource.ParseQuantity(*memoryCPURatio)
-	if err != nil {
-		setupLog.Error(err, "unable to parse memory-per-core-limit")
-		os.Exit(1)
-	}
-	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
-		Handler: &webhooks.RatioValidator{
-			RatioLimit: &limit,
-			Ratio: &ratio.Fetcher{
-				Client: mgr.GetClient(),
-			},
-		},
-	})
-
-	if err = (&controllers.RatioReconciler{
-		Client:     mgr.GetClient(),
-		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
-		Scheme:     mgr.GetScheme(),
-		RatioLimit: &limit,
-		Ratio: &ratio.Fetcher{
-			Client:            mgr.GetClient(),
-			OrganizationLabel: *organizationLabel,
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ratio")
-		os.Exit(1)
-	}
-	//+kubebuilder:scaffold:builder
+	registerRatioController(mgr, *memoryCPURatio, *organizationLabel)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to setup health endpoint")
@@ -114,6 +87,35 @@ func main() {
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
+}
+
+func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) {
+	limit, err := resource.ParseQuantity(memoryCPURatio)
+	if err != nil {
+		setupLog.Error(err, "unable to parse memory-per-core-limit")
+		os.Exit(1)
+	}
+	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
+		Handler: &webhooks.RatioValidator{
+			RatioLimit: &limit,
+			Ratio: &ratio.Fetcher{
+				Client: mgr.GetClient(),
+			},
+		},
+	})
+	if err := (&controllers.RatioReconciler{
+		Client:     mgr.GetClient(),
+		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
+		Scheme:     mgr.GetScheme(),
+		RatioLimit: &limit,
+		Ratio: &ratio.Fetcher{
+			Client:            mgr.GetClient(),
+			OrganizationLabel: orgLabel,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ratio")
 		os.Exit(1)
 	}
 }
