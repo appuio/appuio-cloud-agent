@@ -35,7 +35,7 @@ func (f Fetcher) FetchRatio(ctx context.Context, name string) (*Ratio, error) {
 	disabledAnnot, ok := ns.Annotations[RatioValidatiorDisableAnnotation]
 	if ok {
 		disabled, err := strconv.ParseBool(disabledAnnot)
-		if err != nil || disabled {
+		if err == nil && disabled {
 			return nil, ErrorDisabled
 		}
 	}

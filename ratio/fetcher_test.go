@@ -77,6 +77,24 @@ func TestRatioValidator_Handle(t *testing.T) {
 			memory: "1337Gi",
 			cpu:    "0",
 		},
+		"Fetch_WronglyDisabledNamespace": {
+			namespace: "notdisabled-bar",
+			objects: []client.Object{
+				podFromResources("foo1", "foo", []containerResources{
+					{cpu: "1", memory: "1Gi"},
+					{cpu: "2", memory: "1Gi"},
+				}),
+				podFromResources("foo2", "foo", []containerResources{
+					{memory: "1Gi"},
+				}),
+				podFromResources("foo", "notdisabled-bar", []containerResources{
+					{memory: "1337Gi"},
+				}),
+			},
+			memory: "1337Gi",
+			cpu:    "0",
+		},
+
 		"Fetch_DisabledNamespace": {
 			namespace: "disabled-bar",
 			objects: []client.Object{
@@ -193,8 +211,12 @@ func prepareTest(t *testing.T, cfg testCfg) Fetcher {
 	otherDisabledNs.Annotations = map[string]string{
 		RatioValidatiorDisableAnnotation: "true",
 	}
+	wronglyDisabledNs := testNamespace("notdisabled-bar")
+	wronglyDisabledNs.Annotations = map[string]string{
+		RatioValidatiorDisableAnnotation: "banana",
+	}
 
-	initObjs := append(cfg.initObjs, testNamespace("foo"), testNamespace("fail-foo"), orgNs, barNs, disabledNs, otherDisabledNs)
+	initObjs := append(cfg.initObjs, testNamespace("foo"), testNamespace("fail-foo"), orgNs, barNs, disabledNs, otherDisabledNs, wronglyDisabledNs)
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(initObjs...).
