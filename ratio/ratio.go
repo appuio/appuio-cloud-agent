@@ -1,6 +1,8 @@
-package webhooks
+package ratio
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -10,15 +12,15 @@ import (
 
 // Ratio records resource requests and can calculate the current memory to CPU request ratio
 type Ratio struct {
-	cpu    *inf.Dec
-	memory *inf.Dec
+	CPU    *inf.Dec
+	Memory *inf.Dec
 }
 
 // NewRatio returns an initialized Ratio
 func NewRatio() *Ratio {
 	return &Ratio{
-		cpu:    &inf.Dec{},
-		memory: &inf.Dec{},
+		CPU:    &inf.Dec{},
+		Memory: &inf.Dec{},
 	}
 }
 
@@ -31,8 +33,8 @@ func (r *Ratio) recordReplicatedPodSpec(replicas int32, spec corev1.PodSpec) *Ra
 	}
 	rep := inf.NewDec(int64(replicas), 0)
 
-	r.cpu.Add(r.cpu, cpu.Mul(cpu, rep))
-	r.memory.Add(r.memory, mem.Mul(mem, rep))
+	r.CPU.Add(r.CPU, cpu.Mul(cpu, rep))
+	r.Memory.Add(r.Memory, mem.Mul(mem, rep))
 	return r
 }
 
@@ -71,10 +73,10 @@ func (r *Ratio) RecordStatefulSet(stss ...appsv1.StatefulSet) *Ratio {
 // Ratio returns the memory to CPU ratio of the recorded objects.
 // Returns nil if there are no CPU requests.
 func (r Ratio) Ratio() *resource.Quantity {
-	if r.cpu.Cmp(inf.NewDec(0, 0)) <= 0 {
+	if r.CPU.Cmp(inf.NewDec(0, 0)) <= 0 {
 		return nil
 	}
-	rDec := inf.NewDec(0, 0).QuoRound(r.memory, r.cpu, 0, inf.RoundHalfEven)
+	rDec := inf.NewDec(0, 0).QuoRound(r.Memory, r.CPU, 0, inf.RoundHalfEven)
 	return resource.NewDecimalQuantity(*rDec, resource.BinarySI)
 }
 
@@ -87,4 +89,14 @@ func (r Ratio) Below(limit resource.Quantity) bool {
 // String implements Stringer to print ratio
 func (r Ratio) String() string {
 	return r.Ratio().String()
+}
+
+// Warn returns a warning string explaining that the ratio is not considered fair use
+func (r Ratio) Warn(limit *resource.Quantity) string {
+	// WARNING(glrf) Warnings MUST NOT contain newlines. K8s will simply drop your warning if you add newlines.
+	w := fmt.Sprintf("Current memory to CPU ratio of %s/core in this namespace is below the fair use ratio", r.String())
+	if limit != nil {
+		w = fmt.Sprintf("%s of %s/core", w, limit)
+	}
+	return w
 }

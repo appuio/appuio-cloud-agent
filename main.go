@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/appuio/appuio-cloud-agent/webhooks"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -14,6 +13,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/appuio/appuio-cloud-agent/controllers"
+	"github.com/appuio/appuio-cloud-agent/ratio"
+	"github.com/appuio/appuio-cloud-agent/webhooks"
 )
 
 var (
@@ -47,6 +50,8 @@ func main() {
 	webhookPort := flag.Int("webhook-port", 9443, "The port on which the admission webhooks are served")
 
 	memoryCPURatio := flag.String("memory-per-core-limit", "4Gi", "The fair use limit of memory usage per CPU core")
+	organizationLabel := flag.String("organization-label", "appuio.io/organization", "The label used to mark namespaces to belong to an organization")
+
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -68,18 +73,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	limit, err := resource.ParseQuantity(*memoryCPURatio)
-	if err != nil {
-		setupLog.Error(err, "unable to parse memory-per-core-limit")
-		os.Exit(1)
-	}
-	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
-		Handler: &webhooks.RatioValidator{
-			RatioLimit: &limit,
-		},
-	})
-
-	//+kubebuilder:scaffold:builder
+	registerRatioController(mgr, *memoryCPURatio, *organizationLabel)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to setup health endpoint")
@@ -93,6 +87,35 @@ func main() {
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
+}
+
+func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) {
+	limit, err := resource.ParseQuantity(memoryCPURatio)
+	if err != nil {
+		setupLog.Error(err, "unable to parse memory-per-core-limit")
+		os.Exit(1)
+	}
+	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
+		Handler: &webhooks.RatioValidator{
+			RatioLimit: &limit,
+			Ratio: &ratio.Fetcher{
+				Client: mgr.GetClient(),
+			},
+		},
+	})
+	if err := (&controllers.RatioReconciler{
+		Client:     mgr.GetClient(),
+		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
+		Scheme:     mgr.GetScheme(),
+		RatioLimit: &limit,
+		Ratio: &ratio.Fetcher{
+			Client:            mgr.GetClient(),
+			OrganizationLabel: orgLabel,
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ratio")
 		os.Exit(1)
 	}
 }

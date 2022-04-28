@@ -21,6 +21,7 @@ import (
 
 	"testing"
 
+	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -32,15 +33,16 @@ import (
 func TestRatioValidator_Handle(t *testing.T) {
 	ctx := context.Background()
 	tests := map[string]struct {
-		user       string
-		namespace  string
-		resources  []client.Object
-		object     client.Object
-		create     bool
-		limit      string
-		warn       bool
-		fail       bool
-		statusCode int32
+		user         string
+		namespace    string
+		resources    []client.Object
+		object       client.Object
+		mangleObject bool
+		create       bool
+		limit        string
+		warn         bool
+		fail         bool
+		statusCode   int32
 	}{
 
 		"Allow_EmptyNamespace": {
@@ -171,6 +173,20 @@ func TestRatioValidator_Handle(t *testing.T) {
 			warn:   true,
 			create: true,
 		},
+		"Warn_FailMangledPod": {
+			user:      "appuio#foo",
+			namespace: "foo",
+			resources: []client.Object{},
+			object: podFromResources("unfair", "foo", podResource{
+				{cpu: "8", memory: "1Gi"},
+			}),
+			mangleObject: true,
+			limit:        "4Gi",
+			warn:         false,
+			create:       true,
+			fail:         true,
+			statusCode:   http.StatusBadRequest,
+		},
 		"Warn_ConsiderNewDeployment": {
 			user:      "appuio#foo",
 			namespace: "foo",
@@ -186,6 +202,18 @@ func TestRatioValidator_Handle(t *testing.T) {
 			warn:   true,
 			create: true,
 		},
+		"Warn_FailMangledDeployment": {
+			user:         "appuio#foo",
+			namespace:    "foo",
+			resources:    []client.Object{},
+			object:       deploymentFromResources("unfair", "foo", 2, podResource{}),
+			mangleObject: true,
+			limit:        "4Gi",
+			warn:         false,
+			create:       true,
+			fail:         true,
+			statusCode:   http.StatusBadRequest,
+		},
 		"Warn_ConsiderNewStatefulset": {
 			user:      "appuio#foo",
 			namespace: "foo",
@@ -200,6 +228,18 @@ func TestRatioValidator_Handle(t *testing.T) {
 			limit:  "4Gi",
 			warn:   true,
 			create: true,
+		},
+		"Warn_FailMangledSts": {
+			user:         "appuio#foo",
+			namespace:    "foo",
+			resources:    []client.Object{},
+			object:       statefulsetFromResources("unfair", "foo", 2, podResource{}),
+			mangleObject: true,
+			limit:        "4Gi",
+			warn:         false,
+			create:       true,
+			fail:         true,
+			statusCode:   http.StatusBadRequest,
 		},
 	}
 
@@ -238,6 +278,9 @@ func TestRatioValidator_Handle(t *testing.T) {
 
 				raw, err := json.Marshal(tc.object)
 				require.NoError(t, err)
+				if tc.mangleObject {
+					raw = []byte("?invalid")
+				}
 
 				ar.AdmissionRequest.Object = runtime.RawExtension{
 					Raw: raw,
@@ -250,6 +293,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 
 			resp := v.Handle(ctx, ar)
 			if tc.fail {
+				require.NotNil(t, resp.AdmissionResponse.Result)
 				assert.Equal(t, tc.statusCode, resp.AdmissionResponse.Result.Code)
 				assert.True(t, resp.Allowed)
 				return
@@ -278,16 +322,16 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 	require.NoError(t, err)
 	barNs := testNamespace("bar")
 	barNs.Annotations = map[string]string{
-		RatioValidatiorDisableAnnotation: "False",
+		ratio.RatioValidatiorDisableAnnotation: "False",
 	}
 
 	disabledNs := testNamespace("disabled-foo")
 	disabledNs.Annotations = map[string]string{
-		RatioValidatiorDisableAnnotation: "True",
+		ratio.RatioValidatiorDisableAnnotation: "True",
 	}
 	otherDisabledNs := testNamespace("disabled-bar")
 	otherDisabledNs.Annotations = map[string]string{
-		RatioValidatiorDisableAnnotation: "true",
+		ratio.RatioValidatiorDisableAnnotation: "true",
 	}
 
 	initObjs = append(initObjs, testNamespace("foo"), barNs, disabledNs, otherDisabledNs)
@@ -296,10 +340,11 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 		WithObjects(initObjs...).
 		Build()
 
-	uv := &RatioValidator{}
-	uv.InjectClient(failingClient{
-		WithWatch: client,
-	})
+	uv := &RatioValidator{
+		Ratio: ratio.Fetcher{
+			Client: failingClient{client},
+		},
+	}
 	uv.InjectDecoder(decoder)
 	return uv
 }
@@ -370,6 +415,35 @@ func statefulsetFromResources(name, namespace string, replicas int32, res podRes
 	sts.Spec.Replicas = &replicas
 	sts.Spec.Template.Spec.Containers = newTestContainers(res)
 	return &sts
+}
+
+func newTestContainers(res []containerResources) []corev1.Container {
+	var containers []corev1.Container
+	for _, cr := range res {
+		container := corev1.Container{
+			Resources: corev1.ResourceRequirements{
+				Requests: map[corev1.ResourceName]resource.Quantity{},
+			},
+		}
+		if cr.cpu != "" {
+			container.Resources.Requests[corev1.ResourceCPU] = resource.MustParse(cr.cpu)
+		}
+		if cr.memory != "" {
+			container.Resources.Requests[corev1.ResourceMemory] = resource.MustParse(cr.memory)
+		}
+		containers = append(containers, container)
+	}
+	return containers
+}
+
+type deployResource struct {
+	containers []containerResources
+	replicas   int32
+}
+type podResource []containerResources
+type containerResources struct {
+	cpu    string
+	memory string
 }
 
 type failingClient struct {

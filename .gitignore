@@ -16,3 +16,6 @@ node_modules/
 
 # tem cert
 webhook-certs/
+
+# fuzz testcases
+*/testdata/fuzz/
