@@ -193,6 +193,18 @@ func TestRatio_ratio(t *testing.T) {
 			ratio:       "0",
 			smallerThan: "1Mi",
 		},
+		{
+			// Ratio gets rounded up, exact result would be 1917396114 bytes
+			cpu:    "1.4",
+			memory: "2560Mi",
+			ratio:  "1829Mi",
+		},
+		{
+			// Ratio gets rounded up, exact result would be 400.5Mi
+			cpu:    "2",
+			memory: "801Mi",
+			ratio:  "401Mi",
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(fmt.Sprintf("[%s/%s=%s]", tc.memory, tc.cpu, tc.ratio), func(t *testing.T) {

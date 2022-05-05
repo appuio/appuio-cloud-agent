@@ -72,11 +72,18 @@ func (r *Ratio) RecordStatefulSet(stss ...appsv1.StatefulSet) *Ratio {
 
 // Ratio returns the memory to CPU ratio of the recorded objects.
 // Returns nil if there are no CPU requests.
+// Ratio rounds up to the nearest MiB
 func (r Ratio) Ratio() *resource.Quantity {
 	if r.CPU.Cmp(inf.NewDec(0, 0)) <= 0 {
 		return nil
 	}
 	rDec := inf.NewDec(0, 0).QuoRound(r.Memory, r.CPU, 0, inf.RoundHalfEven)
+	// Neither infdec nor resource.Quantity provide rounding to powers of
+	// two. So we round up to the next MiB by dividing the exact result by
+	// 1024*1024, rounding up, and then multiply by 1024*1024 again.
+	mib := inf.NewDec(1024*1024, 0)
+	rDec.QuoRound(rDec, mib, 0, inf.RoundUp)
+	rDec.Mul(rDec, mib)
 	return resource.NewDecimalQuantity(*rDec, resource.BinarySI)
 }
 
