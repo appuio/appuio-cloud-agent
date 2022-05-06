@@ -105,5 +105,6 @@ func (r Ratio) Warn(limit *resource.Quantity) string {
 	if limit != nil {
 		w = fmt.Sprintf("%s of %s/core", w, limit)
 	}
+	w = fmt.Sprintf("%s. APPUiO Cloud bills CPU requests which exceed the fair use ratio.", w)
 	return w
 }
