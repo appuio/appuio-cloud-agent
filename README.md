@@ -58,21 +58,24 @@ spec:
   externalName: 172.21.0.1 # Change to host IP
 EOF
 
-kubctl apply -f ./config/webhook/manifests.yaml
+kubectl apply -f ./config/webhook/manifests.yaml
 
 kubectl patch validatingwebhookconfiguration validating-webhook-configuration \
-  -p '{
-    "webhooks": [
-      {
-        "name": "validate-users.appuio.io",
-        "clientConfig": {
-          "caBundle": "'"$(base64 -w0 "./local-env/webhook-certs/tls.crt)"'",
-          "service": {
-            "namespace": "default",
-            "port": 9443
-          }
-        }
-      }
-    ]
-  }'
+  --type=json -p '[
+    {
+      "op": "add",
+      "path": "/webhooks/0/clientConfig/caBundle",
+      "value": "'"$(base64 -w0 ./webhook-certs/tls.crt)"'"
+    },
+    {
+      "op": "replace",
+      "path": "/webhooks/0/clientConfig/service/namespace",
+      "value": "default"
+    },
+    {
+      "op": "replace",
+      "path": "/webhooks/0/clientConfig/service/port",
+      "value": 9443
+    }
+  ]'
 ```
