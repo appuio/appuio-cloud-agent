@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -15,6 +16,24 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+)
+
+var (
+	fooPod = podFromResources("foo1", "foo", podResource{
+		containers: []containerResources{
+			{cpu: "1", memory: "1Gi"},
+			{cpu: "2", memory: "1Gi"},
+		},
+		phase: corev1.PodRunning,
+	})
+	foo2Pod = podFromResources("foo2", "foo", podResource{
+		containers: []containerResources{{memory: "1Gi"}},
+		phase:      corev1.PodRunning,
+	})
+	foobarPod = podFromResources("foo", "bar", podResource{
+		containers: []containerResources{{memory: "1337Gi"}},
+		phase:      corev1.PodRunning,
+	})
 )
 
 func TestRatioValidator_Handle(t *testing.T) {
@@ -36,16 +55,9 @@ func TestRatioValidator_Handle(t *testing.T) {
 		"Fetch_Namespace": {
 			namespace: "foo",
 			objects: []client.Object{
-				podFromResources("foo1", "foo", []containerResources{
-					{cpu: "1", memory: "1Gi"},
-					{cpu: "2", memory: "1Gi"},
-				}),
-				podFromResources("foo2", "foo", []containerResources{
-					{memory: "1Gi"},
-				}),
-				podFromResources("foo", "bar", []containerResources{
-					{memory: "1337Gi"},
-				}),
+				fooPod,
+				foo2Pod,
+				foobarPod,
 			},
 			memory: "3Gi",
 			cpu:    "3",
@@ -63,16 +75,9 @@ func TestRatioValidator_Handle(t *testing.T) {
 		"Fetch_OtherNamespace": {
 			namespace: "bar",
 			objects: []client.Object{
-				podFromResources("foo1", "foo", []containerResources{
-					{cpu: "1", memory: "1Gi"},
-					{cpu: "2", memory: "1Gi"},
-				}),
-				podFromResources("foo2", "foo", []containerResources{
-					{memory: "1Gi"},
-				}),
-				podFromResources("foo", "bar", []containerResources{
-					{memory: "1337Gi"},
-				}),
+				fooPod,
+				foo2Pod,
+				foobarPod,
 			},
 			memory: "1337Gi",
 			cpu:    "0",
@@ -80,15 +85,13 @@ func TestRatioValidator_Handle(t *testing.T) {
 		"Fetch_WronglyDisabledNamespace": {
 			namespace: "notdisabled-bar",
 			objects: []client.Object{
-				podFromResources("foo1", "foo", []containerResources{
-					{cpu: "1", memory: "1Gi"},
-					{cpu: "2", memory: "1Gi"},
-				}),
-				podFromResources("foo2", "foo", []containerResources{
-					{memory: "1Gi"},
-				}),
-				podFromResources("foo", "notdisabled-bar", []containerResources{
-					{memory: "1337Gi"},
+				fooPod,
+				foo2Pod,
+				podFromResources("foo", "notdisabled-bar", podResource{
+					containers: []containerResources{
+						{memory: "1337Gi"},
+					},
+					phase: corev1.PodRunning,
 				}),
 			},
 			memory: "1337Gi",
@@ -98,15 +101,13 @@ func TestRatioValidator_Handle(t *testing.T) {
 		"Fetch_DisabledNamespace": {
 			namespace: "disabled-bar",
 			objects: []client.Object{
-				podFromResources("foo1", "foo", []containerResources{
-					{cpu: "1", memory: "1Gi"},
-					{cpu: "2", memory: "1Gi"},
-				}),
-				podFromResources("foo2", "foo", []containerResources{
-					{memory: "1Gi"},
-				}),
-				podFromResources("foo", "disabled-bar", []containerResources{
-					{memory: "1337Gi"},
+				fooPod,
+				foo2Pod,
+				podFromResources("foo", "disabled-bar", podResource{
+					containers: []containerResources{
+						{memory: "1337Gi"},
+					},
+					phase: corev1.PodRunning,
 				}),
 			},
 			err: ErrorDisabled,
@@ -114,15 +115,19 @@ func TestRatioValidator_Handle(t *testing.T) {
 		"Fetch_OtherDisabledNamespace": {
 			namespace: "disabled-foo",
 			objects: []client.Object{
-				podFromResources("foo1", "disabled-foo", []containerResources{
-					{cpu: "1", memory: "1Gi"},
-					{cpu: "2", memory: "1Gi"},
+				podFromResources("foo1", "disabled-foo", podResource{
+					containers: []containerResources{
+						{cpu: "1", memory: "1Gi"},
+						{cpu: "2", memory: "1Gi"},
+					},
+					phase: corev1.PodRunning,
 				}),
-				podFromResources("foo2", "foo", []containerResources{
-					{memory: "1Gi"},
-				}),
-				podFromResources("foo", "disabled-bar", []containerResources{
-					{memory: "1337Gi"},
+				foo2Pod,
+				podFromResources("foo", "disabled-bar", podResource{
+					containers: []containerResources{
+						{memory: "1337Gi"},
+					},
+					phase: corev1.PodRunning,
 				}),
 			},
 			err: ErrorDisabled,
@@ -131,15 +136,13 @@ func TestRatioValidator_Handle(t *testing.T) {
 			namespace: "foo",
 			orgLabel:  "appuio.io/org",
 			objects: []client.Object{
-				podFromResources("foo1", "foo", []containerResources{
-					{cpu: "1", memory: "1Gi"},
-					{cpu: "2", memory: "1Gi"},
-				}),
-				podFromResources("foo2", "foo", []containerResources{
-					{memory: "1Gi"},
-				}),
-				podFromResources("foo", "disabled-bar", []containerResources{
-					{memory: "1337Gi"},
+				fooPod,
+				foo2Pod,
+				podFromResources("foo", "disabled-bar", podResource{
+					containers: []containerResources{
+						{memory: "1337Gi"},
+					},
+					phase: corev1.PodRunning,
 				}),
 			},
 			err: ErrorDisabled,
@@ -148,16 +151,20 @@ func TestRatioValidator_Handle(t *testing.T) {
 			namespace: "org",
 			orgLabel:  "appuio.io/org",
 			objects: []client.Object{
-				podFromResources("foo1", "org", []containerResources{
-					{cpu: "1", memory: "1Gi"},
-					{cpu: "2", memory: "1Gi"},
+				podFromResources("foo1", "org", podResource{
+					containers: []containerResources{
+						{cpu: "1", memory: "1Gi"},
+						{cpu: "2", memory: "1Gi"},
+					},
+					phase: corev1.PodRunning,
 				}),
-				podFromResources("foo2", "org", []containerResources{
-					{memory: "1Gi"},
+				podFromResources("foo2", "org", podResource{
+					containers: []containerResources{
+						{memory: "1Gi"},
+					},
+					phase: corev1.PodRunning,
 				}),
-				podFromResources("foo", "bar", []containerResources{
-					{memory: "1337Gi"},
-				}),
+				foobarPod,
 			},
 			memory: "3Gi",
 			cpu:    "3",

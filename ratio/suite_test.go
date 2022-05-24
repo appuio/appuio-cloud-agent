@@ -72,8 +72,11 @@ func podFromResources(name, namespace string, res podResource) *corev1.Pod {
 			Name:      name,
 			Namespace: namespace,
 		},
+		Status: corev1.PodStatus{
+			Phase: res.phase,
+		},
 	}
-	for i, cr := range res {
+	for i, cr := range res.containers {
 		c := corev1.Container{
 			Name: fmt.Sprintf("container-%d", i),
 			Resources: corev1.ResourceRequirements{
@@ -95,7 +98,10 @@ type deployResource struct {
 	containers []containerResources
 	replicas   int32
 }
-type podResource []containerResources
+type podResource struct {
+	containers []containerResources
+	phase      corev1.PodPhase
+}
 type containerResources struct {
 	cpu    string
 	memory string
