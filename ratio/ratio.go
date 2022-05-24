@@ -38,10 +38,13 @@ func (r *Ratio) recordReplicatedPodSpec(replicas int32, spec corev1.PodSpec) *Ra
 	return r
 }
 
-// RecordPod collects all requests in the given Pod(s) and adds it to the ratio
+// RecordPod collects all requests in the given Pod(s), and adds it to the ratio
+// The function only considers pods in phase `Running`.
 func (r *Ratio) RecordPod(pods ...corev1.Pod) *Ratio {
 	for _, pod := range pods {
-		r.recordReplicatedPodSpec(1, pod.Spec)
+		if pod.Status.Phase == corev1.PodRunning {
+			r.recordReplicatedPodSpec(1, pod.Spec)
+		}
 	}
 	return r
 }
