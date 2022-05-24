@@ -83,6 +83,37 @@ func TestRatio_Record(t *testing.T) {
 			cpuSum:    "702m",
 			memorySum: "6245Mi",
 		},
+		"running+completed pod": {
+			pods: []podResource{
+				{
+					containers: []containerResources{
+						{
+							cpu:    "500m",
+							memory: "4Gi",
+						},
+						{
+							cpu:    "101m",
+							memory: "1Gi",
+						},
+					},
+					phase: corev1.PodRunning,
+				},
+				{
+					containers: []containerResources{
+						{
+							memory: "1Gi",
+						},
+						{
+							cpu:    "101m",
+							memory: "101Mi",
+						},
+					},
+					phase: corev1.PodSucceeded,
+				},
+			},
+			cpuSum:    "601m",
+			memorySum: "5Gi",
+		},
 		"deployments": {
 			deployments: []deployResource{
 				{
