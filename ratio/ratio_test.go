@@ -21,10 +21,13 @@ func TestRatio_Record(t *testing.T) {
 		"single container": {
 			pods: []podResource{
 				{
-					{
-						cpu:    "1",
-						memory: "4Gi",
+					containers: []containerResources{
+						{
+							cpu:    "1",
+							memory: "4Gi",
+						},
 					},
+					phase: corev1.PodRunning,
 				},
 			},
 			cpuSum:    "1",
@@ -33,14 +36,17 @@ func TestRatio_Record(t *testing.T) {
 		"multi container": {
 			pods: []podResource{
 				{
-					{
-						cpu:    "500m",
-						memory: "4Gi",
+					containers: []containerResources{
+						{
+							cpu:    "500m",
+							memory: "4Gi",
+						},
+						{
+							cpu:    "701m",
+							memory: "1Gi",
+						},
 					},
-					{
-						cpu:    "701m",
-						memory: "1Gi",
-					},
+					phase: corev1.PodRunning,
 				},
 			},
 			cpuSum:    "1201m",
@@ -49,23 +55,29 @@ func TestRatio_Record(t *testing.T) {
 		"multi pod": {
 			pods: []podResource{
 				{
-					{
-						cpu:    "500m",
-						memory: "4Gi",
+					containers: []containerResources{
+						{
+							cpu:    "500m",
+							memory: "4Gi",
+						},
+						{
+							cpu:    "101m",
+							memory: "1Gi",
+						},
 					},
-					{
-						cpu:    "101m",
-						memory: "1Gi",
-					},
+					phase: corev1.PodRunning,
 				},
 				{
-					{
-						memory: "1Gi",
+					containers: []containerResources{
+						{
+							memory: "1Gi",
+						},
+						{
+							cpu:    "101m",
+							memory: "101Mi",
+						},
 					},
-					{
-						cpu:    "101m",
-						memory: "101Mi",
-					},
+					phase: corev1.PodRunning,
 				},
 			},
 			cpuSum:    "702m",
@@ -134,8 +146,12 @@ func TestRatio_Record(t *testing.T) {
 
 			r := NewRatio()
 			for _, pr := range tc.pods {
-				pod := corev1.Pod{}
-				pod.Spec.Containers = newTestContainers(pr)
+				pod := corev1.Pod{
+					Status: corev1.PodStatus{
+						Phase: pr.phase,
+					},
+				}
+				pod.Spec.Containers = newTestContainers(pr.containers)
 				r.RecordPod(pod)
 			}
 

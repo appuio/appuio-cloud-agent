@@ -192,4 +192,7 @@ var testPod = &corev1.Pod{
 		Name:      "pod",
 		Namespace: "foo",
 	},
+	Status: corev1.PodStatus{
+		Phase: corev1.PodRunning,
+	},
 }

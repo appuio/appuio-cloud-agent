@@ -367,6 +367,9 @@ func podFromResources(name, namespace string, res podResource) *corev1.Pod {
 			Name:      name,
 			Namespace: namespace,
 		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
 	}
 	for i, cr := range res {
 		c := corev1.Container{
