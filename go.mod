@@ -3,7 +3,7 @@ module github.com/appuio/appuio-cloud-agent
 go 1.18
 
 require (
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.8.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
