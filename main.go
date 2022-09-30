@@ -105,6 +105,13 @@ func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) 
 			},
 		},
 	})
+	mgr.GetWebhookServer().Register("/validate-validate-namespace-node-selector", &webhook.Admission{
+		Handler: &webhooks.NamespaceNodeSelectorValidator{},
+	})
+	mgr.GetWebhookServer().Register("/validate-validate-workload-node-selector", &webhook.Admission{
+		Handler: &webhooks.WorkloadNodeSelectorValidator{},
+	})
+
 	if err := (&controllers.RatioReconciler{
 		Client:     mgr.GetClient(),
 		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
