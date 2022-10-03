@@ -32,7 +32,7 @@ build-docker: build-bin ## Build docker image
 
 .PHONY: run
 run:
-	go run . -webhook-cert-dir webhook-certs -zap-devel -zap-log-level info
+	go run . -webhook-cert-dir webhook-certs -zap-devel -zap-log-level debug
 
 .PHONY: test
 test: test-go ## All-in-one test

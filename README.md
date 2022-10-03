@@ -43,6 +43,9 @@ You can do this by applying the following manifests:
 ```
 HOSTIP=$(docker inspect appuio-cloud-agent-v1.23.0-control-plane | jq '.[0].NetworkSettings.Networks.kind.Gateway')
 
+# Under Docker for Mac `docker.for.mac.localhost` can be used instead of the host IP.
+# HOSTIP=docker.for.mac.localhost
+
 cat <<EOF | sed -e "s/172.21.0.1/$HOSTIP/g" | kubectl apply -f -
 apiVersion: v1
 kind: Service
@@ -59,6 +62,8 @@ spec:
 EOF
 
 kubectl apply -f ./config/webhook/manifests.yaml
+
+# On BSD/MacOS base64 must be called without `-w0`
 
 kubectl patch validatingwebhookconfiguration validating-webhook-configuration \
   --type=json -p '[
