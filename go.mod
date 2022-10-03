@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/stretchr/testify v1.8.0
+	go.uber.org/multierr v1.6.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.25.2
 	k8s.io/apimachinery v0.25.2
@@ -60,7 +61,6 @@ require (
 	github.com/spf13/cobra v1.4.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect

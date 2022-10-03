@@ -8,6 +8,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+// +kubebuilder:webhook:path=/validate-workload-node-selector,name=validate-workload-node-selector.appuio.io,admissionReviewVersions=v1,sideEffects=none,mutating=false,failurePolicy=Fail,groups=*,resources=daemonsets;deployments;jobs;statefulsets;cronjobs,verbs=create;update,versions=*,matchPolicy=equivalent
+
 // WorkloadNodeSelectorValidator checks workloads for allowed node selectors.
 type WorkloadNodeSelectorValidator struct {
 	decoder *admission.Decoder
@@ -28,4 +30,10 @@ func (v *WorkloadNodeSelectorValidator) Handle(ctx context.Context, req admissio
 
 	l.V(1).Info("allowed: not yet implemented")
 	return admission.Allowed("not yet implemented")
+}
+
+// InjectDecoder injects a Admission request decoder
+func (v *WorkloadNodeSelectorValidator) InjectDecoder(d *admission.Decoder) error {
+	v.decoder = d
+	return nil
 }
