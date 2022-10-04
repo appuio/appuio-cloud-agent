@@ -12,6 +12,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/appuio/appuio-cloud-agent/skipper"
 	"github.com/appuio/appuio-cloud-agent/validate"
 )
 
@@ -21,28 +22,28 @@ func Test_NamespaceNodeSelectorValidator_Handle(t *testing.T) {
 
 	subject := NamespaceNodeSelectorValidator{
 		allowedNodeSelectors: allowed,
+		skipper:              skipper.NoopSkipper{},
 	}
 	require.NoError(t, subject.InjectDecoder(decoder(t)))
 
-	var resp admission.Response
+	testCases := []struct {
+		name        string
+		annotations map[string]string
+		allowed     bool
+	}{
+		{"no node selector", nil, true},
+		{"allowed node selector", map[string]string{OpenshiftNodeSelectorAnnotation: "appuio.io/node-class=flex"}, true},
+		{"disallowed node selector", map[string]string{OpenshiftNodeSelectorAnnotation: "appuio.io/node-class=premium"}, false},
+		{"invalid node selector", map[string]string{OpenshiftNodeSelectorAnnotation: "??"}, false},
+	}
 
-	resp = subject.Handle(context.Background(), admissionRequestForObject(t, newNamespace("test", nil, nil)))
-	require.True(t, resp.Allowed)
-
-	resp = subject.Handle(context.Background(), admissionRequestForObject(t, newNamespace("test", nil, map[string]string{
-		OpenshiftNodeSelectorAnnotation: "appuio.io/node-class=flex",
-	})))
-	require.True(t, resp.Allowed)
-
-	resp = subject.Handle(context.Background(), admissionRequestForObject(t, newNamespace("test", nil, map[string]string{
-		OpenshiftNodeSelectorAnnotation: "???",
-	})))
-	require.False(t, resp.Allowed)
-
-	resp = subject.Handle(context.Background(), admissionRequestForObject(t, newNamespace("test", nil, map[string]string{
-		OpenshiftNodeSelectorAnnotation: "appuio.io/node-class=xxl",
-	})))
-	require.False(t, resp.Allowed)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := subject.Handle(context.Background(), admissionRequestForObject(t, newNamespace("test", nil, tc.annotations)))
+			t.Log("Response:", resp.Result.Reason, resp.Result.Message)
+			require.Equal(t, tc.allowed, resp.Allowed)
+		})
+	}
 }
 
 func newNamespace(name string, labels, annotations map[string]string) *corev1.Namespace {

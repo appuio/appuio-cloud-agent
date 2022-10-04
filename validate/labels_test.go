@@ -13,7 +13,6 @@ func Test_AllowedLabels_Add(t *testing.T) {
 	assert.NoError(t, v.Add("my.ns.io/.+", "a|b|c"))
 
 	const invalidRegex = "invalid("
-	assert.Error(t, v.Add("", "a|b|c"))
 	assert.Error(t, v.Add(invalidRegex, "valid"))
 	assert.Error(t, v.Add("valid", invalidRegex))
 }

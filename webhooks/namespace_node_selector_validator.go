@@ -2,8 +2,8 @@ package webhooks
 
 import (
 	"context"
-	"strings"
 
+	"github.com/appuio/appuio-cloud-agent/skipper"
 	"github.com/appuio/appuio-cloud-agent/validate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -19,6 +19,7 @@ const OpenshiftNodeSelectorAnnotation = "openshift.io/node-selector"
 type NamespaceNodeSelectorValidator struct {
 	decoder *admission.Decoder
 
+	skipper              skipper.Skipper
 	allowedNodeSelectors *validate.AllowedLabels
 }
 
@@ -30,20 +31,23 @@ func (v *NamespaceNodeSelectorValidator) Handle(ctx context.Context, req admissi
 		WithValues("namespace", req.Namespace, "name", req.Name,
 			"group", req.Kind.Group, "version", req.Kind.Version, "kind", req.Kind.Kind)
 
-	if strings.HasPrefix(req.UserInfo.Username, "system:") {
-		// Is service account or kube system user: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-subjects
-		l.V(1).Info("allowed: system user")
-		return admission.Allowed("system user")
-	}
-
 	if req.Kind.Group != "" || req.Kind.Kind != "Namespace" {
 		l.V(1).Info("allowed: not a namespace")
 		return admission.Allowed("not a namespace")
 	}
 
-	ns := corev1.Namespace{}
-	err := v.decoder.Decode(req, &ns)
+	skip, err := v.skipper.Skip(req)
 	if err != nil {
+		l.Error(err, "error while checking skipper")
+		return admission.Errored(500, err)
+	}
+	if skip {
+		l.V(1).Info("allowed: skipped")
+		return admission.Allowed("skipped")
+	}
+
+	ns := corev1.Namespace{}
+	if err := v.decoder.Decode(req, &ns); err != nil {
 		l.Error(err, "failed to decode request")
 		return admission.Errored(400, err)
 	}
