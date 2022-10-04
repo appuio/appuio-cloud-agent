@@ -2,6 +2,7 @@ package webhooks
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/appuio/appuio-cloud-agent/skipper"
 	"github.com/appuio/appuio-cloud-agent/validate"
@@ -19,8 +20,8 @@ const OpenshiftNodeSelectorAnnotation = "openshift.io/node-selector"
 type NamespaceNodeSelectorValidator struct {
 	decoder *admission.Decoder
 
-	skipper              skipper.Skipper
-	allowedNodeSelectors *validate.AllowedLabels
+	Skipper              skipper.Skipper
+	AllowedNodeSelectors *validate.AllowedLabels
 }
 
 // Handle handles the admission requests
@@ -36,7 +37,7 @@ func (v *NamespaceNodeSelectorValidator) Handle(ctx context.Context, req admissi
 		return admission.Allowed("not a namespace")
 	}
 
-	skip, err := v.skipper.Skip(req)
+	skip, err := v.Skipper.Skip(req)
 	if err != nil {
 		l.Error(err, "error while checking skipper")
 		return admission.Errored(500, err)
@@ -64,9 +65,9 @@ func (v *NamespaceNodeSelectorValidator) Handle(ctx context.Context, req admissi
 		return admission.Errored(400, err)
 	}
 
-	if err := v.allowedNodeSelectors.Validate(sel); err != nil {
-		l.V(1).Info("denied: disallowed node selector")
-		return admission.Denied(err.Error())
+	if err := v.AllowedNodeSelectors.Validate(sel); err != nil {
+		l.V(1).Info("denied: node selector not allowed", "err", err)
+		return admission.Denied(fmt.Sprintf("node selector not allowed: %s", err.Error()))
 	}
 
 	l.V(1).Info("allowed: valid node selector")

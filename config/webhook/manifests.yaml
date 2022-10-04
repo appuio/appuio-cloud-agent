@@ -61,11 +61,12 @@ webhooks:
   - apiGroups:
     - '*'
     apiVersions:
-    - '*'
+    - v1
     operations:
     - CREATE
     - UPDATE
     resources:
+    - pods
     - daemonsets
     - deployments
     - jobs

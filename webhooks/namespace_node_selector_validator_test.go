@@ -21,8 +21,8 @@ func Test_NamespaceNodeSelectorValidator_Handle(t *testing.T) {
 	require.NoError(t, allowed.Add("appuio.io/node-class", "flex|plus"))
 
 	subject := NamespaceNodeSelectorValidator{
-		allowedNodeSelectors: allowed,
-		skipper:              skipper.NoopSkipper{},
+		AllowedNodeSelectors: allowed,
+		Skipper:              skipper.NoopSkipper{},
 	}
 	require.NoError(t, subject.InjectDecoder(decoder(t)))
 

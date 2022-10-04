@@ -8,6 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -16,6 +18,8 @@ import (
 
 	"github.com/appuio/appuio-cloud-agent/controllers"
 	"github.com/appuio/appuio-cloud-agent/ratio"
+	"github.com/appuio/appuio-cloud-agent/skipper"
+	"github.com/appuio/appuio-cloud-agent/validate"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
 )
 
@@ -73,7 +77,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	kubeInformer := kubeinformers.NewSharedInformerFactory(kubernetes.NewForConfigOrDie(mgr.GetConfig()), 15*time.Minute)
+
 	registerRatioController(mgr, *memoryCPURatio, *organizationLabel)
+
+	psk := skipper.NewPrivilegedUserSkipper(kubeInformer)
+	ans := &validate.AllowedLabels{}
+	ans.Add("appuio.io/node-class", "flex|plus")
+	registerNodeSelectorValidationWebhooks(mgr, psk, ans)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to setup health endpoint")
@@ -91,6 +102,21 @@ func main() {
 	}
 }
 
+func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skipper skipper.Skipper, allowedNodeSelectors *validate.AllowedLabels) {
+	mgr.GetWebhookServer().Register("/validate-namespace-node-selector", &webhook.Admission{
+		Handler: &webhooks.NamespaceNodeSelectorValidator{
+			Skipper:              skipper,
+			AllowedNodeSelectors: allowedNodeSelectors,
+		},
+	})
+	mgr.GetWebhookServer().Register("/validate-workload-node-selector", &webhook.Admission{
+		Handler: &webhooks.WorkloadNodeSelectorValidator{
+			Skipper:              skipper,
+			AllowedNodeSelectors: allowedNodeSelectors,
+		},
+	})
+}
+
 func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) {
 	limit, err := resource.ParseQuantity(memoryCPURatio)
 	if err != nil {
@@ -104,12 +130,6 @@ func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) 
 				Client: mgr.GetClient(),
 			},
 		},
-	})
-	mgr.GetWebhookServer().Register("/validate-namespace-node-selector", &webhook.Admission{
-		Handler: &webhooks.NamespaceNodeSelectorValidator{},
-	})
-	mgr.GetWebhookServer().Register("/validate-workload-node-selector", &webhook.Admission{
-		Handler: &webhooks.WorkloadNodeSelectorValidator{},
 	})
 
 	if err := (&controllers.RatioReconciler{

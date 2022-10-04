@@ -1,9 +1,11 @@
 package skipper
 
 import (
-	"github.com/appuio/appuio-cloud-agent/skipper/userinfo"
+	kubeinformers "k8s.io/client-go/informers"
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/appuio/appuio-cloud-agent/skipper/userinfo"
 )
 
 var _ Skipper = &PrivilegedUserSkipper{}
@@ -17,6 +19,14 @@ type PrivilegedUserSkipper struct {
 	PrivilegedUsers        []string
 	PrivilegedRoles        []string
 	PrivilegedClusterRoles []string
+}
+
+// NewPrivilegedUserSkipper creates a new PrivilegedUserSkipper with the *Lister set.
+func NewPrivilegedUserSkipper(inf kubeinformers.SharedInformerFactory) *PrivilegedUserSkipper {
+	return &PrivilegedUserSkipper{
+		RoleBindingLister:        inf.Rbac().V1().RoleBindings().Lister(),
+		ClusterRoleBindingLister: inf.Rbac().V1().ClusterRoleBindings().Lister(),
+	}
 }
 
 func (s *PrivilegedUserSkipper) Skip(req admission.Request) (bool, error) {
