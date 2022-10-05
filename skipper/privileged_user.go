@@ -9,6 +9,8 @@ import (
 	"github.com/appuio/appuio-cloud-agent/skipper/userinfo"
 )
 
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings;rolebindings,verbs=get;list;watch
+
 var _ Skipper = &PrivilegedUserSkipper{}
 
 // PrivilegedUserSkipper skips request validations for privileged users.
