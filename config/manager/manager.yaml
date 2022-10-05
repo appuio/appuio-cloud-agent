@@ -55,7 +55,7 @@ spec:
             memory: 128Mi
       serviceAccountName: appuio-cloud-agent
       terminationGracePeriodSeconds: 10
-    volumes:
-      - name: config
-        configMap:
-          name: appuio-cloud-agent-config
+      volumes:
+        - name: config
+          configMap:
+            name: appuio-cloud-agent-config
