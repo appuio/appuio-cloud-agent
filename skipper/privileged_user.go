@@ -1,6 +1,7 @@
 package skipper
 
 import (
+	"github.com/minio/pkg/wildcard"
 	kubeinformers "k8s.io/client-go/informers"
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -30,17 +31,17 @@ func NewPrivilegedUserSkipper(inf kubeinformers.SharedInformerFactory) *Privileg
 }
 
 func (s *PrivilegedUserSkipper) Skip(req admission.Request) (bool, error) {
-	for _, ag := range s.PrivilegedGroups {
-		for _, ug := range req.UserInfo.Groups {
-			if ug == ag {
-				return true, nil
-			}
+	for _, pu := range s.PrivilegedUsers {
+		if wildcard.Match(pu, req.UserInfo.Username) {
+			return true, nil
 		}
 	}
 
-	for _, au := range s.PrivilegedUsers {
-		if req.UserInfo.Username == au {
-			return true, nil
+	for _, pg := range s.PrivilegedGroups {
+		for _, ug := range req.UserInfo.Groups {
+			if wildcard.Match(pg, ug) {
+				return true, nil
+			}
 		}
 	}
 
@@ -49,17 +50,17 @@ func (s *PrivilegedUserSkipper) Skip(req admission.Request) (bool, error) {
 		return false, err
 	}
 
-	for _, acr := range s.PrivilegedClusterRoles {
+	for _, pcr := range s.PrivilegedClusterRoles {
 		for _, cr := range clusterroles {
-			if cr == acr {
+			if wildcard.Match(pcr, cr) {
 				return true, nil
 			}
 		}
 	}
 
-	for _, acr := range s.PrivilegedRoles {
-		for _, cr := range roles {
-			if cr == acr {
+	for _, pr := range s.PrivilegedRoles {
+		for _, r := range roles {
+			if wildcard.Match(pr, r) {
 				return true, nil
 			}
 		}

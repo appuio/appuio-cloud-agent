@@ -60,7 +60,7 @@ func Test_UserInfo_Skip(t *testing.T) {
 		PrivilegedGroups:       []string{"admins"},
 		PrivilegedUsers:        []string{"chucktesta"},
 		PrivilegedRoles:        []string{"argocd:default"},
-		PrivilegedClusterRoles: []string{"cluster-image-registry-operator"},
+		PrivilegedClusterRoles: []string{"cluster-*-operator"},
 	}
 
 	testCases := []struct {

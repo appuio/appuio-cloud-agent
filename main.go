@@ -53,8 +53,13 @@ func main() {
 	webhookCertDir := flag.String("webhook-cert-dir", "", "Directory holding TLS certificate and key for the webhook server. If left empty, {TempDir}/k8s-webhook-server/serving-certs is used")
 	webhookPort := flag.Int("webhook-port", 9443, "The port on which the admission webhooks are served")
 
-	memoryCPURatio := flag.String("memory-per-core-limit", "4Gi", "The fair use limit of memory usage per CPU core")
-	organizationLabel := flag.String("organization-label", "appuio.io/organization", "The label used to mark namespaces to belong to an organization")
+	configFilePath := flag.String("config-file", "./config.yaml", "Path to the configuration file")
+
+	conf, err := ConfigFromFile(*configFilePath)
+	if err != nil {
+		setupLog.Error(err, "unable to read config file")
+		os.Exit(1)
+	}
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
@@ -79,11 +84,20 @@ func main() {
 
 	kubeInformer := kubeinformers.NewSharedInformerFactory(kubernetes.NewForConfigOrDie(mgr.GetConfig()), 15*time.Minute)
 
-	registerRatioController(mgr, *memoryCPURatio, *organizationLabel)
+	registerRatioController(mgr, conf.MemoryPerCoreLimit, conf.OrganizationLabel)
 
 	psk := skipper.NewPrivilegedUserSkipper(kubeInformer)
+	psk.PrivilegedClusterRoles = conf.PrivilegedClusterRoles
+	psk.PrivilegedRoles = conf.PrivilegedRoles
+	psk.PrivilegedGroups = conf.PrivilegedGroups
+	psk.PrivilegedUsers = conf.PrivilegedUsers
 	ans := &validate.AllowedLabels{}
-	ans.Add("appuio.io/node-class", "flex|plus")
+	for k, v := range conf.AllowedNodeSelectors {
+		if err := ans.Add(k, v); err != nil {
+			setupLog.Error(err, "unable to add allowed node selector")
+			os.Exit(1)
+		}
+	}
 	registerNodeSelectorValidationWebhooks(mgr, psk, ans)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
