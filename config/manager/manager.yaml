@@ -22,7 +22,7 @@ spec:
         - appuio-cloud-agent
         args:
         - --leader-elect
-        - --config=/config/config.yaml
+        - --config-file=/config/config.yaml
         volumeMounts:
           - mountPath: /config/config.yaml
             name: config
