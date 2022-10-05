@@ -5,6 +5,6 @@ generatorOptions:
   disableNameSuffixHash: true
 
 configMapGenerator:
-  - name: manager-config
+  - name: appuio-cloud-agent-config
     files:
       - config.yaml=controller_manager_config.yaml

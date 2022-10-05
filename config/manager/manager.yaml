@@ -58,4 +58,4 @@ spec:
     volumes:
       - name: config
         configMap:
-          name: manager-config
+          name: appuio-cloud-agent-config
