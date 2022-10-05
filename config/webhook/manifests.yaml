@@ -5,71 +5,72 @@ metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-namespace-node-selector
-  failurePolicy: Fail
-  matchPolicy: Equivalent
-  name: validate-namespace-node-selector.appuio.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - namespaces
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-request-ratio
-  failurePolicy: Ignore
-  matchPolicy: Equivalent
-  name: validate-request-ratio.appuio.io
-  rules:
-  - apiGroups:
-    - '*'
-    apiVersions:
-    - '*'
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - '*'
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-workload-node-selector
-  failurePolicy: Fail
-  matchPolicy: Equivalent
-  name: validate-workload-node-selector.appuio.io
-  rules:
-  - apiGroups:
-    - '*'
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - pods
-    - daemonsets
-    - deployments
-    - jobs
-    - statefulsets
-    - cronjobs
-  sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: system
+        path: /validate-namespace-node-selector
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: validate-namespace-node-selector.appuio.io
+    rules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - namespaces
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: system
+        path: /validate-request-ratio
+    failurePolicy: Ignore
+    matchPolicy: Equivalent
+    name: validate-request-ratio.appuio.io
+    rules:
+      - apiGroups:
+          - '*'
+        apiVersions:
+          - '*'
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - '*'
+        scope: Namespaced
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: system
+        path: /validate-workload-node-selector
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: validate-workload-node-selector.appuio.io
+    rules:
+      - apiGroups:
+          - '*'
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+          - daemonsets
+          - deployments
+          - jobs
+          - statefulsets
+          - cronjobs
+    sideEffects: None
