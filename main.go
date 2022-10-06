@@ -8,8 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	kubeinformers "k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -82,14 +80,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	kubeInformer := kubeinformers.NewSharedInformerFactory(kubernetes.NewForConfigOrDie(mgr.GetConfig()), 15*time.Minute)
-
 	registerRatioController(mgr, conf.MemoryPerCoreLimit, conf.OrganizationLabel)
 
-	psk := skipper.NewPrivilegedUserSkipper(kubeInformer)
-	psk.PrivilegedClusterRoles = conf.PrivilegedClusterRoles
-	psk.PrivilegedGroups = conf.PrivilegedGroups
-	psk.PrivilegedUsers = conf.PrivilegedUsers
+	psk := &skipper.PrivilegedUserSkipper{
+		Client: mgr.GetClient(),
+
+		PrivilegedUsers:        conf.PrivilegedUsers,
+		PrivilegedGroups:       conf.PrivilegedGroups,
+		PrivilegedClusterRoles: conf.PrivilegedClusterRoles,
+	}
 	ans := &validate.AllowedLabels{}
 	for k, v := range conf.AllowedNodeSelectors {
 		if err := ans.Add(k, v); err != nil {

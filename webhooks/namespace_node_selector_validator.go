@@ -37,7 +37,7 @@ func (v *NamespaceNodeSelectorValidator) Handle(ctx context.Context, req admissi
 		return admission.Allowed("not a namespace")
 	}
 
-	skip, err := v.Skipper.Skip(req)
+	skip, err := v.Skipper.Skip(ctx, req)
 	if err != nil {
 		l.Error(err, "error while checking skipper")
 		return admission.Errored(500, err)

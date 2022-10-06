@@ -1,21 +1,20 @@
 package skipper
 
 import (
+	"context"
+
 	"github.com/minio/pkg/wildcard"
-	kubeinformers "k8s.io/client-go/informers"
-	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/appuio/appuio-cloud-agent/skipper/userinfo"
 )
 
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch
-
 var _ Skipper = &PrivilegedUserSkipper{}
 
 // PrivilegedUserSkipper skips request validations for privileged users.
 type PrivilegedUserSkipper struct {
-	ClusterRoleBindingLister rbacv1listers.ClusterRoleBindingLister
+	Client client.Reader
 
 	PrivilegedGroups []string
 	PrivilegedUsers  []string
@@ -28,14 +27,7 @@ type PrivilegedUserSkipper struct {
 	PrivilegedClusterRoles []string
 }
 
-// NewPrivilegedUserSkipper creates a new PrivilegedUserSkipper with the *Lister set.
-func NewPrivilegedUserSkipper(inf kubeinformers.SharedInformerFactory) *PrivilegedUserSkipper {
-	return &PrivilegedUserSkipper{
-		ClusterRoleBindingLister: inf.Rbac().V1().ClusterRoleBindings().Lister(),
-	}
-}
-
-func (s *PrivilegedUserSkipper) Skip(req admission.Request) (bool, error) {
+func (s *PrivilegedUserSkipper) Skip(ctx context.Context, req admission.Request) (bool, error) {
 	for _, pu := range s.PrivilegedUsers {
 		if wildcard.Match(pu, req.UserInfo.Username) {
 			return true, nil
@@ -50,7 +42,7 @@ func (s *PrivilegedUserSkipper) Skip(req admission.Request) (bool, error) {
 		}
 	}
 
-	clusterroles, err := userinfo.ClusterRoleRefs(s.ClusterRoleBindingLister, req.UserInfo)
+	clusterroles, err := userinfo.ClusterRoleRefsForUser(ctx, s.Client, req.UserInfo)
 	if err != nil {
 		return false, err
 	}

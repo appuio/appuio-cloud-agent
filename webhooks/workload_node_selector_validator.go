@@ -30,7 +30,7 @@ func (v *WorkloadNodeSelectorValidator) Handle(ctx context.Context, req admissio
 		WithValues("id", req.UID, "user", req.UserInfo.Username).
 		WithValues("namespace", req.Namespace, "name", req.Name, "kind", req.Kind.Kind)
 
-	skip, err := v.Skipper.Skip(req)
+	skip, err := v.Skipper.Skip(ctx, req)
 	if err != nil {
 		l.Error(err, "error while checking skipper")
 		return admission.Errored(500, err)
