@@ -53,17 +53,17 @@ func main() {
 
 	configFilePath := flag.String("config-file", "./config.yaml", "Path to the configuration file")
 
+	opts := zap.Options{}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
 	conf, err := ConfigFromFile(*configFilePath)
 	if err != nil {
 		setupLog.Error(err, "unable to read config file")
 		os.Exit(1)
 	}
 
-	opts := zap.Options{}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 	ctx := ctrl.SetupSignalHandler()
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
