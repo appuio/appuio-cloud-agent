@@ -46,3 +46,12 @@ func Test_AllowedLabels_Validate(t *testing.T) {
 	assert.ErrorContains(t, err, "some.other.io=a")
 	assert.ErrorContains(t, err, "some.other.io/2=a")
 }
+
+func Test_AllowedLabels_String(t *testing.T) {
+	v := validate.AllowedLabels{}
+
+	v.Add("my.ns.io/node-class", "flex|plus")
+	v.Add("app", ".+")
+
+	assert.Equal(t, "allowed { ^(?:my.ns.io/node-class)$=^(?:flex|plus)$, ^(?:app)$=^(?:.+)$ }", v.String())
+}

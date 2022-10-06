@@ -3,6 +3,7 @@ package validate
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"go.uber.org/multierr"
 )
@@ -10,6 +11,10 @@ import (
 type regexKV struct {
 	K *regexp.Regexp
 	V *regexp.Regexp
+}
+
+func (r regexKV) String() string {
+	return fmt.Sprintf("%s=%s", r.K, r.V)
 }
 
 // AllowedLabels allows labels to be validated against a set of allowed labels.
@@ -46,7 +51,11 @@ func (l *AllowedLabels) Validate(lbls map[string]string) error {
 		violations = append(violations, l.ValidateLabel(k, v))
 	}
 
-	return multierr.Combine(violations...)
+	if err := multierr.Combine(violations...); err != nil {
+		return fmt.Errorf("label validation failed: %w, allowed labels: %s", err, l.formatLabels())
+	}
+
+	return nil
 }
 
 func anchor(s string) string {
@@ -62,4 +71,17 @@ func (l *AllowedLabels) ValidateLabel(key, value string) error {
 	}
 
 	return fmt.Errorf("label %s=%s is not allowed", key, value)
+}
+
+func (l *AllowedLabels) String() string {
+	return fmt.Sprintf("allowed %s", l.formatLabels())
+}
+
+func (l *AllowedLabels) formatLabels() string {
+	s := make([]string, 0, len(l.allowed))
+	for _, allowed := range l.allowed {
+		s = append(s, allowed.String())
+	}
+
+	return fmt.Sprintf("{ %s }", strings.Join(s, ", "))
 }
