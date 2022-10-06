@@ -15,9 +15,12 @@ type Config struct {
 
 	// Privileged* is a list of the given type allowed to bypass restrictions.
 	// Wildcards are supported (e.g. "system:serviceaccount:default:*" or "cluster-*-operator").
+	// ClusterRoles are only ever matched if they are bound through a ClusterRoleBinding,
+	// this is different from the behavior of Kyverno.
+	// This is done to prevent a user from wrongly configuring a low-privileged ClusterRole which users
+	// can then bind to themselves to bypass the restrictions.
 	PrivilegedGroups       []string
 	PrivilegedUsers        []string
-	PrivilegedRoles        []string
 	PrivilegedClusterRoles []string
 
 	// AllowedNodeSelectors is a map of allowed node selectors.

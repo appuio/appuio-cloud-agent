@@ -88,7 +88,6 @@ func main() {
 
 	psk := skipper.NewPrivilegedUserSkipper(kubeInformer)
 	psk.PrivilegedClusterRoles = conf.PrivilegedClusterRoles
-	psk.PrivilegedRoles = conf.PrivilegedRoles
 	psk.PrivilegedGroups = conf.PrivilegedGroups
 	psk.PrivilegedUsers = conf.PrivilegedUsers
 	ans := &validate.AllowedLabels{}

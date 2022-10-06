@@ -3,11 +3,14 @@
 OrganizationLabel: appuio.io/organization
 # The fair use limit of memory usage per CPU core
 MemoryPerCoreLimit: 4Gi
-# Privileged* is a list of the given type allowed to bypass restrictions
-# Wildcards are supported (e.g. "system:serviceaccount:*" or "cluster-*-operator").
+# Privileged* is a list of the given type allowed to bypass restrictions.
+# Wildcards are supported (e.g. "system:serviceaccount:default:*" or "cluster-*-operator").
+# ClusterRoles are only ever matched if they are bound through a ClusterRoleBinding,
+# this is different from the behavior of Kyverno.
+# This is done to prevent a user from wrongly configuring a low-privileged ClusterRole which users
+# can then bind to themselves to bypass the restrictions.
 PrivilegedGroups: []
 PrivilegedUsers: []
-PrivilegedRoles: []
 PrivilegedClusterRoles:
   - cluster-admin
 # Key and values are anchored regexes

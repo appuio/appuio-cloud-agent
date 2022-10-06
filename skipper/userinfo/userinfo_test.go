@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestRoleRefs(t *testing.T) {
@@ -38,52 +37,10 @@ func TestRoleRefs(t *testing.T) {
 		},
 	}
 
-	rLister := mocks.MockRoleBindingLister{
-		MockLister: mocks.MockLister[*rbacv1.RoleBinding]{
-			Objects: []*rbacv1.RoleBinding{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "myns",
-					},
-					Subjects: []rbacv1.Subject{
-						{
-							Kind: "ServiceAccount",
-							Name: "default",
-						},
-					},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: "testrole",
-					},
-				}, {
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "myns",
-					},
-					Subjects: []rbacv1.Subject{
-						{
-							Kind: "ServiceAccount",
-							Name: "default",
-						},
-						{
-							Kind:      "ServiceAccount",
-							Name:      "default",
-							Namespace: "otherns",
-						},
-					},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "ClusterRole",
-						Name: "referenced-from-role-binding",
-					},
-				},
-			},
-		},
-	}
-
 	testCases := []struct {
 		name                 string
 		userInfo             authenticationv1.UserInfo
 		expectedClusterRoles []string
-		expectedRoles        []string
 	}{
 		{
 			name: "User ClusterRole",
@@ -106,29 +63,13 @@ func TestRoleRefs(t *testing.T) {
 			},
 			expectedClusterRoles: []string{"cluster-role"},
 		},
-		{
-			name: "User Role",
-			userInfo: authenticationv1.UserInfo{
-				Username: "system:serviceaccount:myns:default",
-			},
-			expectedRoles:        []string{"myns:testrole"},
-			expectedClusterRoles: []string{"myns:referenced-from-role-binding"},
-		},
-		{
-			name: "Role Referenced from Namespace other than RoleBinding",
-			userInfo: authenticationv1.UserInfo{
-				Username: "system:serviceaccount:otherns:default",
-			},
-			expectedClusterRoles: []string{"myns:referenced-from-role-binding"},
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			roles, clusterRoles, err := userinfo.RoleRefs(&rLister, &crLister, tc.userInfo)
+			clusterRoles, err := userinfo.ClusterRoleRefs(&crLister, tc.userInfo)
 			require.NoError(t, err)
 			require.ElementsMatch(t, tc.expectedClusterRoles, clusterRoles)
-			require.ElementsMatch(t, tc.expectedRoles, roles)
 		})
 	}
 }
