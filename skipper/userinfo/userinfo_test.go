@@ -107,7 +107,7 @@ func TestRoleRefs(t *testing.T) {
 				Username: "system:serviceaccount:myns:default",
 			},
 			expectedRoles:        []string{"myns:testrole"},
-			expectedClusterRoles: []string{"referenced-from-role-binding"},
+			expectedClusterRoles: []string{"myns:referenced-from-role-binding"},
 		},
 	}
 

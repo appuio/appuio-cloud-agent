@@ -17,7 +17,8 @@ const (
 	roleKind        = "Role"
 )
 
-// RoleRefs gets the list of roles and cluster roles for the incoming api-request
+// RoleRefs gets the list of roles and cluster roles for the given user information.
+// Roles and cluster roles bound through RoleBindings are prefixed with the namespace the binding is in.
 func RoleRefs(rbLister rbacv1listers.RoleBindingLister, crbLister rbacv1listers.ClusterRoleBindingLister, user authenticationv1.UserInfo) (roles []string, clusterroles []string, err error) {
 	roleBindings, err := rbLister.List(labels.Everything())
 	if err != nil {
@@ -37,11 +38,12 @@ func roleRefs(roleBindings []*rbacv1.RoleBinding, userInfo authenticationv1.User
 	for _, rolebinding := range roleBindings {
 		for _, subject := range rolebinding.Subjects {
 			if matchSubject(subject, userInfo, rolebinding.Namespace) {
+				name := rolebinding.Namespace + ":" + rolebinding.RoleRef.Name
 				switch rolebinding.RoleRef.Kind {
 				case roleKind:
-					roles = append(roles, rolebinding.Namespace+":"+rolebinding.RoleRef.Name)
+					roles = append(roles, name)
 				case clusterRoleKind:
-					clusterRoles = append(clusterRoles, rolebinding.RoleRef.Name)
+					clusterRoles = append(clusterRoles, name)
 				}
 			}
 		}
