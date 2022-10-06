@@ -67,6 +67,9 @@ func clusterRoleRefs(clusterroleBindings []*rbacv1.ClusterRoleBinding, userInfo 
 func matchSubject(subject rbacv1.Subject, userInfo authenticationv1.UserInfo, namespace string) bool {
 	switch subject.Kind {
 	case rbacv1.ServiceAccountKind:
+		if subject.Namespace != "" {
+			namespace = subject.Namespace
+		}
 		return userInfo.Username == saPrefix+namespace+":"+subject.Name
 	case rbacv1.UserKind:
 		return userInfo.Username == subject.Name

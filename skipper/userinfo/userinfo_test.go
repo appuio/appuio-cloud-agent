@@ -64,6 +64,11 @@ func TestRoleRefs(t *testing.T) {
 							Kind: "ServiceAccount",
 							Name: "default",
 						},
+						{
+							Kind:      "ServiceAccount",
+							Name:      "default",
+							Namespace: "otherns",
+						},
 					},
 					RoleRef: rbacv1.RoleRef{
 						Kind: "ClusterRole",
@@ -107,6 +112,13 @@ func TestRoleRefs(t *testing.T) {
 				Username: "system:serviceaccount:myns:default",
 			},
 			expectedRoles:        []string{"myns:testrole"},
+			expectedClusterRoles: []string{"myns:referenced-from-role-binding"},
+		},
+		{
+			name: "Role Referenced from Namespace other than RoleBinding",
+			userInfo: authenticationv1.UserInfo{
+				Username: "system:serviceaccount:otherns:default",
+			},
 			expectedClusterRoles: []string{"myns:referenced-from-role-binding"},
 		},
 	}
