@@ -6,11 +6,11 @@ type Skipper interface {
 	Skip(admission.Request) (bool, error)
 }
 
-// NoopSkipper is a Skipper that never/always skips.
-type NoopSkipper struct {
+// StaticSkipper is a Skipper that never/always skips.
+type StaticSkipper struct {
 	ShouldSkip bool
 }
 
-func (s NoopSkipper) Skip(_ admission.Request) (bool, error) {
+func (s StaticSkipper) Skip(_ admission.Request) (bool, error) {
 	return s.ShouldSkip, nil
 }

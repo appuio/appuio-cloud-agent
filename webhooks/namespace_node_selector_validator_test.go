@@ -22,7 +22,7 @@ func Test_NamespaceNodeSelectorValidator_Handle(t *testing.T) {
 
 	subject := NamespaceNodeSelectorValidator{
 		AllowedNodeSelectors: allowed,
-		Skipper:              skipper.NoopSkipper{},
+		Skipper:              skipper.StaticSkipper{},
 	}
 	require.NoError(t, subject.InjectDecoder(decoder(t)))
 

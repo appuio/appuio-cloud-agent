@@ -20,7 +20,7 @@ func Test_WorkloadNodeSelectorValidator_Handle(t *testing.T) {
 
 	subject := WorkloadNodeSelectorValidator{
 		AllowedNodeSelectors: allowed,
-		Skipper:              skipper.NoopSkipper{},
+		Skipper:              skipper.StaticSkipper{},
 	}
 	require.NoError(t, subject.InjectDecoder(decoder(t)))
 
