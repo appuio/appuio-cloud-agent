@@ -3,3 +3,8 @@ resources:
 
 generatorOptions:
   disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: appuio-cloud-agent-config
+    files:
+      - config.yaml=controller_manager_config.yaml

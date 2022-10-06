@@ -32,7 +32,7 @@ build-docker: build-bin ## Build docker image
 
 .PHONY: run
 run:
-	go run . -webhook-cert-dir webhook-certs -zap-devel -zap-log-level info
+	go run . -webhook-cert-dir webhook-certs -zap-devel -zap-log-level debug
 
 .PHONY: test
 test: test-go ## All-in-one test
@@ -61,6 +61,8 @@ lint: fmt vet generate ## All-in-one linting
 .PHONY: generate
 generate: ## Generate additional code and artifacts
 	@go generate ./...
+	@# Kubebuilder misses the scope field for the webhook generator
+	@yq eval -i '.webhooks[] |= with(select(.name == "validate-request-ratio.appuio.io"); .rules[] |= .scope = "Namespaced")' config/webhook/manifests.yaml
 
 .PHONY: clean
 clean: ## Cleans local build artifacts

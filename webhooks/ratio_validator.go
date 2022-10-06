@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+// +kubebuilder:webhook:path=/validate-request-ratio,name=validate-request-ratio.appuio.io,admissionReviewVersions=v1,sideEffects=none,mutating=false,failurePolicy=ignore,groups=*,resources=*,verbs=create;update,versions=*,matchPolicy=equivalent
+
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 

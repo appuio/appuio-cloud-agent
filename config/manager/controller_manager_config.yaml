@@ -1,0 +1,15 @@
+---
+# The label used to mark namespaces to belong to an organization
+OrganizationLabel: appuio.io/organization
+# The fair use limit of memory usage per CPU core
+MemoryPerCoreLimit: 4Gi
+# Privileged* is a list of the given type allowed to bypass restrictions
+# Wildcards are supported (e.g. "system:serviceaccount:*" or "cluster-*-operator").
+PrivilegedGroups: []
+PrivilegedUsers: []
+PrivilegedRoles: []
+PrivilegedClusterRoles:
+  - cluster-admin
+# Key and values are anchored regexes
+AllowedNodeSelectors:
+  appuio.io/node-class: flex|plus

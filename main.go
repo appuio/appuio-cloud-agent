@@ -16,6 +16,8 @@ import (
 
 	"github.com/appuio/appuio-cloud-agent/controllers"
 	"github.com/appuio/appuio-cloud-agent/ratio"
+	"github.com/appuio/appuio-cloud-agent/skipper"
+	"github.com/appuio/appuio-cloud-agent/validate"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
 )
 
@@ -49,14 +51,19 @@ func main() {
 	webhookCertDir := flag.String("webhook-cert-dir", "", "Directory holding TLS certificate and key for the webhook server. If left empty, {TempDir}/k8s-webhook-server/serving-certs is used")
 	webhookPort := flag.Int("webhook-port", 9443, "The port on which the admission webhooks are served")
 
-	memoryCPURatio := flag.String("memory-per-core-limit", "4Gi", "The fair use limit of memory usage per CPU core")
-	organizationLabel := flag.String("organization-label", "appuio.io/organization", "The label used to mark namespaces to belong to an organization")
+	configFilePath := flag.String("config-file", "./config.yaml", "Path to the configuration file")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
-
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	conf, err := ConfigFromFile(*configFilePath)
+	if err != nil {
+		setupLog.Error(err, "unable to read config file")
+		os.Exit(1)
+	}
+
 	ctx := ctrl.SetupSignalHandler()
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -73,7 +80,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	registerRatioController(mgr, *memoryCPURatio, *organizationLabel)
+	registerRatioController(mgr, conf.MemoryPerCoreLimit, conf.OrganizationLabel)
+
+	psk := &skipper.PrivilegedUserSkipper{
+		Client: mgr.GetClient(),
+
+		PrivilegedUsers:        conf.PrivilegedUsers,
+		PrivilegedGroups:       conf.PrivilegedGroups,
+		PrivilegedClusterRoles: conf.PrivilegedClusterRoles,
+	}
+	registerNodeSelectorValidationWebhooks(mgr, psk, conf)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to setup health endpoint")
@@ -91,6 +107,30 @@ func main() {
 	}
 }
 
+func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skipper skipper.Skipper, conf Config) {
+	ans := &validate.AllowedLabels{}
+	for k, v := range conf.AllowedNodeSelectors {
+		if err := ans.Add(k, v); err != nil {
+			setupLog.Error(err, "unable to add allowed node selector")
+			os.Exit(1)
+		}
+	}
+
+	mgr.GetWebhookServer().Register("/validate-namespace-node-selector", &webhook.Admission{
+		Handler: &webhooks.NamespaceNodeSelectorValidator{
+			Skipper:               skipper,
+			AllowedNodeSelectors:  ans,
+			DenyEmptyNodeSelector: conf.NamespaceDenyEmptyNodeSelector,
+		},
+	})
+	mgr.GetWebhookServer().Register("/validate-workload-node-selector", &webhook.Admission{
+		Handler: &webhooks.WorkloadNodeSelectorValidator{
+			Skipper:              skipper,
+			AllowedNodeSelectors: ans,
+		},
+	})
+}
+
 func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) {
 	limit, err := resource.ParseQuantity(memoryCPURatio)
 	if err != nil {
@@ -105,6 +145,7 @@ func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) 
 			},
 		},
 	})
+
 	if err := (&controllers.RatioReconciler{
 		Client:     mgr.GetClient(),
 		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
