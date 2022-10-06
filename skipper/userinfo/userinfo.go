@@ -22,7 +22,7 @@ const (
 // Only cluster roles bound by a cluster role binding are returned.
 // Role bindings are ignored.
 func ClusterRoleRefsForUser(ctx context.Context, cli client.Reader, user authenticationv1.UserInfo) (clusterroles []string, err error) {
-	crbs, err := listClusterRoles(ctx, cli)
+	crbs, err := listClusterRoleBindings(ctx, cli)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list clusterrolebindings: %v", err)
 	}
@@ -58,7 +58,7 @@ func matchSubject(subject rbacv1.Subject, userInfo authenticationv1.UserInfo) bo
 	return false
 }
 
-func listClusterRoles(ctx context.Context, cli client.Reader) ([]rbacv1.ClusterRoleBinding, error) {
+func listClusterRoleBindings(ctx context.Context, cli client.Reader) ([]rbacv1.ClusterRoleBinding, error) {
 	var crbs rbacv1.ClusterRoleBindingList
 	if err := cli.List(ctx, &crbs); err != nil {
 		return nil, err
