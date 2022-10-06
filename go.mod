@@ -12,12 +12,12 @@ require (
 	k8s.io/client-go v0.25.2
 	sigs.k8s.io/controller-runtime v0.13.0
 	sigs.k8s.io/controller-tools v0.10.0
-	sigs.k8s.io/kind v0.12.0
+	sigs.k8s.io/kind v0.16.0
 	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
-	github.com/BurntSushi/toml v0.4.1 // indirect
+	github.com/BurntSushi/toml v1.0.0 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/alessio/shellescape v1.4.1 // indirect
