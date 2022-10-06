@@ -16,7 +16,6 @@ const (
 	saPrefix = "system:serviceaccount:"
 
 	clusterRoleKind = "ClusterRole"
-	roleKind        = "Role"
 )
 
 // ClusterRoleRefsForUser gets the list of roles and cluster roles for the given user information.
