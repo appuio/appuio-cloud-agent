@@ -15,7 +15,7 @@ type regexKV struct {
 // AllowedLabels allows labels to be validated against a set of allowed labels.
 // The zero value is ready to use and denies all labels.
 type AllowedLabels struct {
-	allowed map[string]regexKV
+	allowed []regexKV
 }
 
 // Add adds a new allowed label.
@@ -23,7 +23,7 @@ type AllowedLabels struct {
 // An error is returned if the regular expressions are invalid or the key is empty.
 func (l *AllowedLabels) Add(key, value string) error {
 	if l.allowed == nil {
-		l.allowed = make(map[string]regexKV)
+		l.allowed = make([]regexKV, 0)
 	}
 
 	keyR, err := regexp.Compile(anchor(key))
@@ -35,7 +35,7 @@ func (l *AllowedLabels) Add(key, value string) error {
 		return fmt.Errorf("invalid value: %w", err)
 	}
 
-	l.allowed[key] = regexKV{K: keyR, V: valueR}
+	l.allowed = append(l.allowed, regexKV{K: keyR, V: valueR})
 	return nil
 }
 
