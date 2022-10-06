@@ -89,14 +89,7 @@ func main() {
 		PrivilegedGroups:       conf.PrivilegedGroups,
 		PrivilegedClusterRoles: conf.PrivilegedClusterRoles,
 	}
-	ans := &validate.AllowedLabels{}
-	for k, v := range conf.AllowedNodeSelectors {
-		if err := ans.Add(k, v); err != nil {
-			setupLog.Error(err, "unable to add allowed node selector")
-			os.Exit(1)
-		}
-	}
-	registerNodeSelectorValidationWebhooks(mgr, psk, ans)
+	registerNodeSelectorValidationWebhooks(mgr, psk, conf)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to setup health endpoint")
@@ -114,17 +107,26 @@ func main() {
 	}
 }
 
-func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skipper skipper.Skipper, allowedNodeSelectors *validate.AllowedLabels) {
+func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skipper skipper.Skipper, conf Config) {
+	ans := &validate.AllowedLabels{}
+	for k, v := range conf.AllowedNodeSelectors {
+		if err := ans.Add(k, v); err != nil {
+			setupLog.Error(err, "unable to add allowed node selector")
+			os.Exit(1)
+		}
+	}
+
 	mgr.GetWebhookServer().Register("/validate-namespace-node-selector", &webhook.Admission{
 		Handler: &webhooks.NamespaceNodeSelectorValidator{
-			Skipper:              skipper,
-			AllowedNodeSelectors: allowedNodeSelectors,
+			Skipper:               skipper,
+			AllowedNodeSelectors:  ans,
+			DenyEmptyNodeSelector: conf.NamespaceDenyEmptyNodeSelector,
 		},
 	})
 	mgr.GetWebhookServer().Register("/validate-workload-node-selector", &webhook.Admission{
 		Handler: &webhooks.WorkloadNodeSelectorValidator{
 			Skipper:              skipper,
-			AllowedNodeSelectors: allowedNodeSelectors,
+			AllowedNodeSelectors: ans,
 		},
 	})
 }

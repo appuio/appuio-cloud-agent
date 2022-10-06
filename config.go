@@ -26,6 +26,10 @@ type Config struct {
 	// AllowedNodeSelectors is a map of allowed node selectors.
 	// Both the key and the value are anchored regexes.
 	AllowedNodeSelectors map[string]string
+
+	// NamespaceDenyEmptyNodeSelector is a flag to enable or disable the rejection of empty node selectors on namespaces.
+	// If true this will reject a { "openshift.io/node-selector": "" } annotation.
+	NamespaceDenyEmptyNodeSelector bool
 }
 
 func ConfigFromFile(path string) (Config, error) {

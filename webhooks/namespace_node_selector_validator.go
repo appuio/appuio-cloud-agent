@@ -22,6 +22,9 @@ type NamespaceNodeSelectorValidator struct {
 
 	Skipper              skipper.Skipper
 	AllowedNodeSelectors *validate.AllowedLabels
+
+	// DenyEmptyNodeSelector denies namespaces with an existing but empty node selector.
+	DenyEmptyNodeSelector bool
 }
 
 // Handle handles the admission requests
@@ -53,10 +56,14 @@ func (v *NamespaceNodeSelectorValidator) Handle(ctx context.Context, req admissi
 		return admission.Errored(400, err)
 	}
 
-	rawSel := ns.Annotations[OpenshiftNodeSelectorAnnotation]
-	if rawSel == "" {
+	rawSel, exists := ns.Annotations[OpenshiftNodeSelectorAnnotation]
+	if !exists {
 		l.V(1).Info("allowed: no node selector")
 		return admission.Allowed("no node selector")
+	}
+	if rawSel == "" && v.DenyEmptyNodeSelector {
+		l.V(1).Info("denied: empty node selector")
+		return admission.Denied("empty `\"\"` node selector")
 	}
 
 	sel, err := labels.ConvertSelectorToLabelsMap(rawSel)

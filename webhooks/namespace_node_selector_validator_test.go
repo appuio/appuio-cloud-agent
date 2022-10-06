@@ -46,6 +46,33 @@ func Test_NamespaceNodeSelectorValidator_Handle(t *testing.T) {
 	}
 }
 
+func Test_NamespaceNodeSelectorValidator_DenyEmpty(t *testing.T) {
+	allowed := &validate.AllowedLabels{}
+	require.NoError(t, allowed.Add("appuio.io/node-class", "flex|plus"))
+
+	subject := NamespaceNodeSelectorValidator{
+		AllowedNodeSelectors: allowed,
+		Skipper:              skipper.StaticSkipper{},
+	}
+	require.NoError(t, subject.InjectDecoder(decoder(t)))
+
+	empty := map[string]string{OpenshiftNodeSelectorAnnotation: ""}
+
+	t.Run("Allow", func(t *testing.T) {
+		subject.DenyEmptyNodeSelector = false
+		resp := subject.Handle(context.Background(), admissionRequestForObject(t, newNamespace("test", nil, empty)))
+		t.Log("Response:", resp.Result.Reason, resp.Result.Message)
+		require.True(t, resp.Allowed)
+	})
+
+	t.Run("Deny", func(t *testing.T) {
+		subject.DenyEmptyNodeSelector = true
+		resp := subject.Handle(context.Background(), admissionRequestForObject(t, newNamespace("test", nil, empty)))
+		t.Log("Response:", resp.Result.Reason, resp.Result.Message)
+		require.False(t, resp.Allowed)
+	})
+}
+
 func newNamespace(name string, labels, annotations map[string]string) *corev1.Namespace {
 	return &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{
