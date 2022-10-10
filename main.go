@@ -62,6 +62,10 @@ func main() {
 		setupLog.Error(err, "unable to read config file")
 		os.Exit(1)
 	}
+	if err := conf.Validate(); err != nil {
+		setupLog.Error(err, "invalid configuration")
+		os.Exit(1)
+	}
 
 	ctx := ctrl.SetupSignalHandler()
 

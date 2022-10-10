@@ -18,8 +18,6 @@ import (
 // +kubebuilder:webhook:path=/mutate-pod-node-selector,name=mutate-pod-node-selector.appuio.io,admissionReviewVersions=v1,sideEffects=none,mutating=true,failurePolicy=Fail,groups="",resources=pods,verbs=create;update,versions=v1,matchPolicy=equivalent
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 
-const AppuioIoDefaultNodeSelector = "appuio.io/default-node-selector"
-
 // PodNodeSelectorMutator checks namespaces for allowed node selectors.
 type PodNodeSelectorMutator struct {
 	decoder *admission.Decoder
@@ -29,6 +27,8 @@ type PodNodeSelectorMutator struct {
 
 	// DefaultNodeSelector is the default node selector to apply to pods
 	DefaultNodeSelector map[string]string
+	// DefaultNamespaceNodeSelectorAnnotation is the annotation to use for the default node selector
+	DefaultNamespaceNodeSelectorAnnotation string
 
 	Skipper skipper.Skipper
 }
@@ -69,8 +69,8 @@ func (v *PodNodeSelectorMutator) Handle(ctx context.Context, req admission.Reque
 	}
 
 	var defaults labels.Set
-	rawDefaults := ns.Annotations[AppuioIoDefaultNodeSelector]
-	if rawDefaults == "" {
+	rawDefaults := ns.Annotations[v.DefaultNamespaceNodeSelectorAnnotation]
+	if v.DefaultNamespaceNodeSelectorAnnotation == "" || rawDefaults == "" {
 		if len(v.DefaultNodeSelector) == 0 {
 			l.V(1).Info("allowed: no default selector")
 			return admission.Allowed("no default selector")
@@ -79,7 +79,7 @@ func (v *PodNodeSelectorMutator) Handle(ctx context.Context, req admission.Reque
 	} else {
 		d, err := labels.ConvertSelectorToLabelsMap(rawDefaults)
 		if err != nil {
-			l.Error(err, "failed to decode "+AppuioIoDefaultNodeSelector)
+			l.Error(err, "failed to decode "+v.DefaultNamespaceNodeSelectorAnnotation)
 			return admission.Errored(400, err)
 		}
 		defaults = d

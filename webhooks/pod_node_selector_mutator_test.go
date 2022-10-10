@@ -20,10 +20,11 @@ import (
 )
 
 func Test_PodNodeSelectorMutator_Handle(t *testing.T) {
+	const nodeSelAnnotation = "appuio.io/default-node-selector"
 
 	crs := []client.Object{
-		newNamespace("ns-with-default-label", nil, map[string]string{AppuioIoDefaultNodeSelector: "appuio.io/node-class=bar"}),
-		newNamespace("ns-with-empty-label", nil, map[string]string{AppuioIoDefaultNodeSelector: ""}),
+		newNamespace("ns-with-default-label", nil, map[string]string{nodeSelAnnotation: "appuio.io/node-class=bar"}),
+		newNamespace("ns-with-empty-label", nil, map[string]string{nodeSelAnnotation: ""}),
 		newNamespace("ns-no-annotations", nil, nil),
 	}
 
@@ -94,9 +95,10 @@ func Test_PodNodeSelectorMutator_Handle(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			subject := PodNodeSelectorMutator{
-				Client:              c,
-				Skipper:             skipper.StaticSkipper{},
-				DefaultNodeSelector: tc.defaultNodeSelector,
+				Client:                                 c,
+				Skipper:                                skipper.StaticSkipper{},
+				DefaultNodeSelector:                    tc.defaultNodeSelector,
+				DefaultNamespaceNodeSelectorAnnotation: nodeSelAnnotation,
 			}
 			subject.InjectDecoder(decoder(t))
 

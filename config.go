@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"os"
 
+	"go.uber.org/multierr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -23,16 +25,10 @@ type Config struct {
 	PrivilegedUsers        []string
 	PrivilegedClusterRoles []string
 
-	// AllowedNodeSelectors is a map of allowed node selectors.
-	// Both the key and the value are anchored regexes.
-	AllowedNodeSelectors map[string]string
-
-	// NamespaceDenyEmptyNodeSelector is a flag to enable or disable the rejection of empty node selectors on namespaces.
-	// If true this will reject a { "openshift.io/node-selector": "" } annotation.
-	NamespaceDenyEmptyNodeSelector bool
-
 	// DefaultNodeSelector are the default node selectors to add to pods if not set from namespace annotation
 	DefaultNodeSelector map[string]string
+	// DefaultNamespaceNodeSelectorAnnotation is the annotation used to set the default node selector for pods in this namespace
+	DefaultNamespaceNodeSelectorAnnotation string
 }
 
 func ConfigFromFile(path string) (Config, error) {
@@ -42,4 +38,17 @@ func ConfigFromFile(path string) (Config, error) {
 	}
 	var c Config
 	return c, yaml.Unmarshal(raw, &c, yaml.DisallowUnknownFields)
+}
+
+func (c Config) Validate() error {
+	var errs []error
+
+	if c.OrganizationLabel == "" {
+		errs = append(errs, errors.New("OrganizationLabel must not be empty"))
+	}
+	if c.MemoryPerCoreLimit == "" {
+		errs = append(errs, errors.New("MemoryPerCoreLimit must not be empty"))
+	}
+
+	return multierr.Combine(errs...)
 }
