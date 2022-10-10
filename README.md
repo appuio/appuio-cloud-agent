@@ -64,23 +64,35 @@ EOF
 kubectl apply -f ./config/webhook/manifests.yaml
 
 # On BSD/MacOS base64 must be called without `-w0`
+cert="$(base64 ./webhook-certs/tls.crt)"
 
-kubectl patch validatingwebhookconfiguration validating-webhook-configuration \
-  --type=json -p '[
+patch_tmpl='.webhooks | keys[] as $i | [
     {
       "op": "add",
-      "path": "/webhooks/0/clientConfig/caBundle",
-      "value": "'"$(base64 -w0 ./webhook-certs/tls.crt)"'"
+      "path": "/webhooks/\($i)/clientConfig/caBundle",
+      "value": "'"$cert"'"
     },
     {
       "op": "replace",
-      "path": "/webhooks/0/clientConfig/service/namespace",
+      "path": "/webhooks/\($i)/clientConfig/service/namespace",
       "value": "default"
     },
     {
       "op": "replace",
-      "path": "/webhooks/0/clientConfig/service/port",
+      "path": "/webhooks/\($i)/clientConfig/service/port",
       "value": 9443
     }
   ]'
+
+patches=$(kubectl get validatingwebhookconfiguration validating-webhook-configuration -ojson \
+  | jq -rc "$patch_tmpl")
+while read -r patch; do
+   kubectl patch validatingwebhookconfiguration validating-webhook-configuration --type=json -p "${patch}"
+done <<< "$patches"
+
+patches=$(kubectl get mutatingwebhookconfigurations mutating-webhook-configuration -ojson \
+  | jq -rc "$patch_tmpl")
+while read -r patch; do
+   kubectl patch mutatingwebhookconfigurations mutating-webhook-configuration --type=json -p "${patch}"
+done <<< "$patches"
 ```

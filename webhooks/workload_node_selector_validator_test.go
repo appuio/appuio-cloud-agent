@@ -38,7 +38,7 @@ func Test_WorkloadNodeSelectorValidator_Handle(t *testing.T) {
 		{"allowed node selector", newJob("allowed", allowedNodeSelector), true},
 		{"allowed node selector", newDaemonSet("allowed", allowedNodeSelector), true},
 		{"allowed node selector", newStatefulSet("allowed", allowedNodeSelector), true},
-		{"allowed node selector", newPod("allowed", allowedNodeSelector), true},
+		{"allowed node selector", newPod("default", "allowed", allowedNodeSelector), true},
 		{"unknown object", newConfigMap("allowed"), false},
 	}
 
@@ -51,14 +51,15 @@ func Test_WorkloadNodeSelectorValidator_Handle(t *testing.T) {
 	}
 }
 
-func newPod(name string, nodeSelector map[string]string) *corev1.Pod {
+func newPod(namespace, name string, nodeSelector map[string]string) *corev1.Pod {
 	return &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: corev1.PodSpec{
 			NodeSelector: nodeSelector,

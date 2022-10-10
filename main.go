@@ -107,7 +107,7 @@ func main() {
 	}
 }
 
-func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skipper skipper.Skipper, conf Config) {
+func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skip skipper.Skipper, conf Config) {
 	ans := &validate.AllowedLabels{}
 	for k, v := range conf.AllowedNodeSelectors {
 		if err := ans.Add(k, v); err != nil {
@@ -118,15 +118,25 @@ func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skipper skipper.Sk
 
 	mgr.GetWebhookServer().Register("/validate-namespace-node-selector", &webhook.Admission{
 		Handler: &webhooks.NamespaceNodeSelectorValidator{
-			Skipper:               skipper,
+			Skipper:               skip,
 			AllowedNodeSelectors:  ans,
 			DenyEmptyNodeSelector: conf.NamespaceDenyEmptyNodeSelector,
 		},
 	})
 	mgr.GetWebhookServer().Register("/validate-workload-node-selector", &webhook.Admission{
 		Handler: &webhooks.WorkloadNodeSelectorValidator{
-			Skipper:              skipper,
+			Skipper:              skip,
 			AllowedNodeSelectors: ans,
+		},
+	})
+	mgr.GetWebhookServer().Register("/mutate-pod-node-selector", &webhook.Admission{
+		Handler: &webhooks.PodNodeSelectorMutator{
+			Skipper: &skipper.NonOrganizationNamespaceSkipper{
+				Client:            mgr.GetClient(),
+				OrganizationLabel: conf.OrganizationLabel,
+			},
+			Client:              mgr.GetClient(),
+			DefaultNodeSelector: conf.DefaultNodeSelector,
 		},
 	})
 }

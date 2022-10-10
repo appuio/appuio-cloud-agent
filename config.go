@@ -30,6 +30,9 @@ type Config struct {
 	// NamespaceDenyEmptyNodeSelector is a flag to enable or disable the rejection of empty node selectors on namespaces.
 	// If true this will reject a { "openshift.io/node-selector": "" } annotation.
 	NamespaceDenyEmptyNodeSelector bool
+
+	// DefaultNodeSelector are the default node selectors to add to pods if not set from namespace annotation
+	DefaultNodeSelector map[string]string
 }
 
 func ConfigFromFile(path string) (Config, error) {
