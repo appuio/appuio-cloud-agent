@@ -81,6 +81,7 @@ func main() {
 
 	registerRatioController(mgr, conf.MemoryPerCoreLimit, conf.OrganizationLabel)
 
+	// Currently unused, but will be used for the next kyverno replacements
 	psk := &skipper.PrivilegedUserSkipper{
 		Client: mgr.GetClient(),
 
@@ -88,7 +89,9 @@ func main() {
 		PrivilegedGroups:       conf.PrivilegedGroups,
 		PrivilegedClusterRoles: conf.PrivilegedClusterRoles,
 	}
-	registerNodeSelectorValidationWebhooks(mgr, psk, conf)
+	_ = psk
+
+	registerNodeSelectorValidationWebhooks(mgr, conf)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to setup health endpoint")
@@ -106,7 +109,7 @@ func main() {
 	}
 }
 
-func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skip skipper.Skipper, conf Config) {
+func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, conf Config) {
 	mgr.GetWebhookServer().Register("/mutate-pod-node-selector", &webhook.Admission{
 		Handler: &webhooks.PodNodeSelectorMutator{
 			Skipper: &skipper.NonOrganizationNamespaceSkipper{
