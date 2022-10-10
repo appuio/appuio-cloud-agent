@@ -64,7 +64,7 @@ EOF
 kubectl apply -f ./config/webhook/manifests.yaml
 
 # On BSD/MacOS base64 must be called without `-w0`
-cert="$(base64 ./webhook-certs/tls.crt)"
+cert="$(base64 -w0 ./webhook-certs/tls.crt)"
 
 patch_tmpl='.webhooks | keys[] as $i | [
     {
