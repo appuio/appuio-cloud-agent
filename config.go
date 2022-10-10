@@ -31,8 +31,8 @@ type Config struct {
 	// If true this will reject a { "openshift.io/node-selector": "" } annotation.
 	NamespaceDenyEmptyNodeSelector bool
 
-	//DefaultNodeSelectors are the default node selectors to add to pods if not set from namespace annotation
-	DefaultNodeSelectors map[string]string
+	// DefaultNodeSelector are the default node selectors to add to pods if not set from namespace annotation
+	DefaultNodeSelector map[string]string
 }
 
 func ConfigFromFile(path string) (Config, error) {

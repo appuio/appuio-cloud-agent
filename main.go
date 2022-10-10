@@ -113,7 +113,8 @@ func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skip skipper.Skipp
 				Client:            mgr.GetClient(),
 				OrganizationLabel: conf.OrganizationLabel,
 			},
-			Client: mgr.GetClient(),
+			Client:              mgr.GetClient(),
+			DefaultNodeSelector: conf.DefaultNodeSelector,
 		},
 	})
 }
