@@ -116,9 +116,10 @@ func main() {
 func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, conf Config) {
 	mgr.GetWebhookServer().Register("/mutate-pod-node-selector", &webhook.Admission{
 		Handler: &webhooks.PodNodeSelectorMutator{
-			Skipper:             skipper.StaticSkipper{ShouldSkip: false},
-			Client:              mgr.GetClient(),
-			DefaultNodeSelector: conf.DefaultNodeSelector,
+			Skipper:                                skipper.StaticSkipper{ShouldSkip: false},
+			Client:                                 mgr.GetClient(),
+			DefaultNodeSelector:                    conf.DefaultNodeSelector,
+			DefaultNamespaceNodeSelectorAnnotation: conf.DefaultNamespaceNodeSelectorAnnotation,
 		},
 	})
 }
