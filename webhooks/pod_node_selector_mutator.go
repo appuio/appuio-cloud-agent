@@ -68,21 +68,14 @@ func (v *PodNodeSelectorMutator) Handle(ctx context.Context, req admission.Reque
 		return admission.Errored(400, err)
 	}
 
-	var defaults labels.Set
-	rawDefaults := ns.Annotations[v.DefaultNamespaceNodeSelectorAnnotation]
-	if v.DefaultNamespaceNodeSelectorAnnotation == "" || rawDefaults == "" {
-		if len(v.DefaultNodeSelector) == 0 {
-			l.V(1).Info("allowed: no default selector")
-			return admission.Allowed("no default selector")
-		}
-		defaults = labels.Set(v.DefaultNodeSelector)
-	} else {
-		d, err := labels.ConvertSelectorToLabelsMap(rawDefaults)
-		if err != nil {
-			l.Error(err, "failed to decode "+v.DefaultNamespaceNodeSelectorAnnotation)
-			return admission.Errored(400, err)
-		}
-		defaults = d
+	defaults, err := v.defaultLabels(ns)
+	if err != nil {
+		l.Error(err, "failed to get default labels")
+		return admission.Errored(500, err)
+	}
+	if len(defaults) == 0 {
+		l.V(1).Info("allowed: no default labels")
+		return admission.Allowed("no default labels")
 	}
 
 	nodeSel, hasNodeSel, err := unstructured.NestedStringMap(rawPod.Object, "spec", "nodeSelector")
@@ -110,12 +103,26 @@ func (v *PodNodeSelectorMutator) Handle(ctx context.Context, req admission.Reque
 	return admission.Patched("added default node selector", patches...)
 }
 
-func escapeJSONPointer(s string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(s, "~", "~0"), "/", "~1")
-}
-
 // InjectDecoder injects a Admission request decoder
 func (v *PodNodeSelectorMutator) InjectDecoder(d *admission.Decoder) error {
 	v.decoder = d
 	return nil
+}
+
+func (v *PodNodeSelectorMutator) defaultLabels(ns corev1.Namespace) (labels.Set, error) {
+	rawDefaults := ns.Annotations[v.DefaultNamespaceNodeSelectorAnnotation]
+	if v.DefaultNamespaceNodeSelectorAnnotation == "" || rawDefaults == "" {
+		return labels.Set(v.DefaultNodeSelector), nil
+	}
+
+	d, err := labels.ConvertSelectorToLabelsMap(rawDefaults)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse default node selector fom %s: %w", v.DefaultNamespaceNodeSelectorAnnotation, err)
+	}
+
+	return d, nil
+}
+
+func escapeJSONPointer(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "~", "~0"), "/", "~1")
 }
