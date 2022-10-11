@@ -17,7 +17,6 @@ import (
 	"github.com/appuio/appuio-cloud-agent/controllers"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/appuio/appuio-cloud-agent/skipper"
-	"github.com/appuio/appuio-cloud-agent/validate"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
 )
 
@@ -63,6 +62,10 @@ func main() {
 		setupLog.Error(err, "unable to read config file")
 		os.Exit(1)
 	}
+	if err := conf.Validate(); err != nil {
+		setupLog.Error(err, "invalid configuration")
+		os.Exit(1)
+	}
 
 	ctx := ctrl.SetupSignalHandler()
 
@@ -82,6 +85,7 @@ func main() {
 
 	registerRatioController(mgr, conf.MemoryPerCoreLimit, conf.OrganizationLabel)
 
+	// Currently unused, but will be used for the next kyverno replacements
 	psk := &skipper.PrivilegedUserSkipper{
 		Client: mgr.GetClient(),
 
@@ -89,7 +93,9 @@ func main() {
 		PrivilegedGroups:       conf.PrivilegedGroups,
 		PrivilegedClusterRoles: conf.PrivilegedClusterRoles,
 	}
-	registerNodeSelectorValidationWebhooks(mgr, psk, conf)
+	_ = psk
+
+	registerNodeSelectorValidationWebhooks(mgr, conf)
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to setup health endpoint")
@@ -107,26 +113,12 @@ func main() {
 	}
 }
 
-func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, skipper skipper.Skipper, conf Config) {
-	ans := &validate.AllowedLabels{}
-	for k, v := range conf.AllowedNodeSelectors {
-		if err := ans.Add(k, v); err != nil {
-			setupLog.Error(err, "unable to add allowed node selector")
-			os.Exit(1)
-		}
-	}
-
-	mgr.GetWebhookServer().Register("/validate-namespace-node-selector", &webhook.Admission{
-		Handler: &webhooks.NamespaceNodeSelectorValidator{
-			Skipper:               skipper,
-			AllowedNodeSelectors:  ans,
-			DenyEmptyNodeSelector: conf.NamespaceDenyEmptyNodeSelector,
-		},
-	})
-	mgr.GetWebhookServer().Register("/validate-workload-node-selector", &webhook.Admission{
-		Handler: &webhooks.WorkloadNodeSelectorValidator{
-			Skipper:              skipper,
-			AllowedNodeSelectors: ans,
+func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, conf Config) {
+	mgr.GetWebhookServer().Register("/mutate-pod-node-selector", &webhook.Admission{
+		Handler: &webhooks.PodNodeSelectorMutator{
+			Skipper:             skipper.StaticSkipper{ShouldSkip: false},
+			Client:              mgr.GetClient(),
+			DefaultNodeSelector: conf.DefaultNodeSelector,
 		},
 	})
 }

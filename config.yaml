@@ -13,9 +13,9 @@ PrivilegedGroups: []
 PrivilegedUsers: []
 PrivilegedClusterRoles:
   - cluster-admin
-# Key and values are anchored regexes
-AllowedNodeSelectors:
-  appuio.io/node-class: flex|plus
-# NamespaceDenyEmptyNodeSelector is a flag to enable or disable the rejection of empty node selectors on namespaces.
-# If true this will reject a { "openshift.io/node-selector": "" } annotation.
-NamespaceDenyEmptyNodeSelector: false
+
+# Default node selectors to add to pods in this namespace
+DefaultNamespaceNodeSelectorAnnotation: appuio.io/default-node-selector
+# Default node selectors to add to pods if not set from namespace annotation
+DefaultNodeSelector:
+  appuio.io/node-class: plus

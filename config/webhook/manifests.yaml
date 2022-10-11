@@ -1,9 +1,9 @@
 ---
 apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
+kind: MutatingWebhookConfiguration
 metadata:
   creationTimestamp: null
-  name: validating-webhook-configuration
+  name: mutating-webhook-configuration
 webhooks:
   - admissionReviewVersions:
       - v1
@@ -11,10 +11,10 @@ webhooks:
       service:
         name: webhook-service
         namespace: system
-        path: /validate-namespace-node-selector
+        path: /mutate-pod-node-selector
     failurePolicy: Fail
     matchPolicy: Equivalent
-    name: validate-namespace-node-selector.appuio.io
+    name: mutate-pod-node-selector.appuio.io
     rules:
       - apiGroups:
           - ""
@@ -24,8 +24,15 @@ webhooks:
           - CREATE
           - UPDATE
         resources:
-          - namespaces
+          - pods
     sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: validating-webhook-configuration
+webhooks:
   - admissionReviewVersions:
       - v1
     clientConfig:
@@ -47,30 +54,4 @@ webhooks:
         resources:
           - '*'
         scope: Namespaced
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-    clientConfig:
-      service:
-        name: webhook-service
-        namespace: system
-        path: /validate-workload-node-selector
-    failurePolicy: Fail
-    matchPolicy: Equivalent
-    name: validate-workload-node-selector.appuio.io
-    rules:
-      - apiGroups:
-          - '*'
-        apiVersions:
-          - v1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - pods
-          - daemonsets
-          - deployments
-          - jobs
-          - statefulsets
-          - cronjobs
     sideEffects: None
