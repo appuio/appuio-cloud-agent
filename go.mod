@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/minio/pkg v1.4.5
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	go.uber.org/multierr v1.8.0
 	gomodules.xyz/jsonpatch/v2 v2.2.0
 	gopkg.in/inf.v0 v0.9.1
