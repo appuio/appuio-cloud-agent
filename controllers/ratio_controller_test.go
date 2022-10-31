@@ -25,7 +25,7 @@ import (
 
 func TestRatioReconciler_Warn(t *testing.T) {
 	recorder := record.NewFakeRecorder(4)
-	_, err := prepareTest(t, testCfg{
+	_, err := prepareRatioTest(t, testRatioCfg{
 		limit:       resource.MustParse("4G"),
 		fetchMemory: resource.MustParse("4G"),
 		fetchCPU:    resource.MustParse("1100m"),
@@ -46,7 +46,7 @@ func TestRatioReconciler_Warn(t *testing.T) {
 
 func TestRatioReconciler_Ok(t *testing.T) {
 	recorder := record.NewFakeRecorder(4)
-	_, err := prepareTest(t, testCfg{
+	_, err := prepareRatioTest(t, testRatioCfg{
 		limit:       resource.MustParse("4G"),
 		fetchMemory: resource.MustParse("4G"),
 		fetchCPU:    resource.MustParse("900m"),
@@ -67,7 +67,7 @@ func TestRatioReconciler_Ok(t *testing.T) {
 
 func TestRatioReconciler_Disabled(t *testing.T) {
 	recorder := record.NewFakeRecorder(4)
-	_, err := prepareTest(t, testCfg{
+	_, err := prepareRatioTest(t, testRatioCfg{
 		limit:    resource.MustParse("4G"),
 		fetchErr: ratio.ErrorDisabled,
 		recorder: recorder,
@@ -87,7 +87,7 @@ func TestRatioReconciler_Disabled(t *testing.T) {
 
 func TestRatioReconciler_Failed(t *testing.T) {
 	recorder := record.NewFakeRecorder(4)
-	_, err := prepareTest(t, testCfg{
+	_, err := prepareRatioTest(t, testRatioCfg{
 		limit:    resource.MustParse("4G"),
 		fetchErr: errors.New("internal"),
 		recorder: recorder,
@@ -112,7 +112,7 @@ func TestRatioReconciler_RecordFailed(t *testing.T) {
 	wrongPod.Name = "asf"
 	wrongPod.Namespace = "asf"
 	recorder := record.NewFakeRecorder(4)
-	_, err := prepareTest(t, testCfg{
+	_, err := prepareRatioTest(t, testRatioCfg{
 		limit:       resource.MustParse("4G"),
 		fetchMemory: resource.MustParse("4G"),
 		fetchCPU:    resource.MustParse("1100m"),
@@ -136,7 +136,7 @@ func TestRatioReconciler_RecordFailed(t *testing.T) {
 	}
 }
 
-type testCfg struct {
+type testRatioCfg struct {
 	limit       resource.Quantity
 	fetchErr    error
 	fetchCPU    resource.Quantity
@@ -145,7 +145,7 @@ type testCfg struct {
 	recorder    record.EventRecorder
 }
 
-func prepareTest(t *testing.T, cfg testCfg) *RatioReconciler {
+func prepareRatioTest(t *testing.T, cfg testRatioCfg) *RatioReconciler {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -162,7 +162,7 @@ func prepareTest(t *testing.T, cfg testCfg) *RatioReconciler {
 		Client:   client,
 		Recorder: cfg.recorder,
 		Scheme:   scheme,
-		Ratio: fakeFetcher{
+		Ratio: fakeRatioFetcher{
 			err: cfg.fetchErr,
 			ratio: &ratio.Ratio{
 				CPU:    cfg.fetchCPU.AsDec(),
@@ -173,12 +173,12 @@ func prepareTest(t *testing.T, cfg testCfg) *RatioReconciler {
 	}
 }
 
-type fakeFetcher struct {
+type fakeRatioFetcher struct {
 	err   error
 	ratio *ratio.Ratio
 }
 
-func (f fakeFetcher) FetchRatio(ctx context.Context, ns string) (*ratio.Ratio, error) {
+func (f fakeRatioFetcher) FetchRatio(ctx context.Context, ns string) (*ratio.Ratio, error) {
 	return f.ratio, f.err
 }
 

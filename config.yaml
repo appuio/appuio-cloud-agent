@@ -19,3 +19,8 @@ DefaultNamespaceNodeSelectorAnnotation: appuio.io/default-node-selector
 # Default node selectors to add to pods if not set from namespace annotation
 DefaultNodeSelector:
   appuio.io/node-class: plus
+
+# A map containing the configuration for rolebindings that are created by default in each organization namespace.
+# The keys are the name of default rolebindings to create and the values are the names of the clusterroles they bind to.
+DefaultOrganizationClusterRoles:
+  admin: admin
