@@ -35,14 +35,6 @@ type Config struct {
 	DefaultOrganizationClusterRoles map[string]string
 }
 
-// RoleConfig is the configuration for a default role created in an organization namespace
-type RoleConfig struct {
-	// Name is the name of the created rolebinding
-	Name string
-	// ClusterRole is the name of the cluster role to bind to the rolebinding
-	ClusterRole string
-}
-
 func ConfigFromFile(path string) (Config, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
