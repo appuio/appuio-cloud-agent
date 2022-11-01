@@ -116,10 +116,10 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 			roleBindings: []rb{
 				{
 					name:    "admin",
-					roleRef: "old-admin",
+					roleRef: "admin",
 					groups:  []string{"buzz", "tom"},
 					labels: map[string]string{
-						LabelRoleBindingUninitiliazied: "true",
+						LabelRoleBindingUninitialized: "true",
 					},
 				},
 			},
@@ -205,7 +205,10 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 						}
 						assert.ElementsMatch(t, expected.groups, foundGroups)
 
-						assert.False(t, rolebindingIsUninitialized(found), "roleBinding should be marked as initialized")
+						assert.False(t, rolebindingIsUninitialized(&found), "roleBinding should be marked as initialized")
+
+						require.Len(t, found.OwnerReferences, 1)
+						assert.Equal(t, tc.namespace, found.OwnerReferences[0].Name)
 						break
 					}
 				}

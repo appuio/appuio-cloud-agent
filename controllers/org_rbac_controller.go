@@ -28,7 +28,7 @@ type OrganizationRBACReconciler struct {
 	DefaultClusterRoles map[string]string
 }
 
-const LabelRoleBindingUninitiliazied = "appuio.io/uninitialized"
+const LabelRoleBindingUninitialized = "appuio.io/uninitialized"
 
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;patch;update
@@ -36,102 +36,83 @@ const LabelRoleBindingUninitiliazied = "appuio.io/uninitialized"
 
 // Reconcile reacts to pod updates and emits events if the fair use request ratio is violated
 func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	namespace := req.Name
-	l := log.FromContext(ctx).WithValues("namespace", namespace)
+	l := log.FromContext(ctx).WithValues("namespace", req.Name)
 
-	org, err := r.getOrganization(ctx, namespace)
-	if err != nil {
+	var ns corev1.Namespace
+	if err := r.Get(ctx, client.ObjectKey{Name: req.Name}, &ns); err != nil {
 		l.Error(err, "unable to get namespace")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	org := r.getOrganization(ns)
 	if org == "" {
 		return ctrl.Result{}, nil
 	}
 
-	rbState, err := r.getRoleBindingStates(ctx, namespace)
-	if err != nil {
-		l.Error(err, "unable to list rolebindings in namespace")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
 	for rb, cr := range r.DefaultClusterRoles {
-		_, initialized := rbState[rb]
-		if !initialized {
-			if err := r.putRoleBinding(ctx, rb, namespace, cr, org); err != nil {
-				l.WithValues("rolebinding", rb).Error(err, "unable to create rolebinding")
-				return ctrl.Result{}, err
-			}
+		if err := r.putRoleBinding(ctx, ns, rb, cr, org); err != nil {
+			l.WithValues("rolebinding", rb).Error(err, "unable to create rolebinding")
+			return ctrl.Result{}, err
 		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *OrganizationRBACReconciler) getOrganization(ctx context.Context, namespace string) (string, error) {
-	var ns corev1.Namespace
-	if err := r.Get(ctx, client.ObjectKey{Name: namespace}, &ns); err != nil {
-		return "", err
-	}
+func (r *OrganizationRBACReconciler) getOrganization(ns corev1.Namespace) string {
 	org := ""
 	nsLabels := ns.Labels
 	if nsLabels != nil {
 		org = nsLabels[r.OrganizationLabel]
 	}
-	return org, nil
+	return org
 }
 
-func (r *OrganizationRBACReconciler) getRoleBindingStates(ctx context.Context, namespace string) (map[string]struct{}, error) {
-	var rolebindings rbacv1.RoleBindingList
-	if err := r.List(ctx, &rolebindings, client.InNamespace(namespace)); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-
-	rbState := map[string]struct{}{}
-	for _, rb := range rolebindings.Items {
-		if !rolebindingIsUninitialized(rb) {
-			rbState[rb.Name] = struct{}{}
-		}
-	}
-	return rbState, nil
-}
-
-func rolebindingIsUninitialized(rolebinding rbacv1.RoleBinding) bool {
-	if rolebinding.Labels == nil {
-		return false
-	}
-	res, err := strconv.ParseBool(rolebinding.Labels[LabelRoleBindingUninitiliazied])
-	return res && err == nil
-}
-
-func (r *OrganizationRBACReconciler) putRoleBinding(ctx context.Context, name, namespace string, clusterRole string, group string) error {
+func (r *OrganizationRBACReconciler) putRoleBinding(ctx context.Context, ns corev1.Namespace, name string, clusterRole string, group string) error {
 	rb := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: namespace,
-		},
-	}
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, rb, func() error {
-		rb.Subjects = []rbacv1.Subject{
-			{
-				Kind:     "Group",
-				APIGroup: "rbac.authorization.k8s.io",
-				Name:     group,
+			Namespace: ns.Name,
+			Labels: map[string]string{
+				LabelRoleBindingUninitialized: "true",
 			},
-		}
-		rb.RoleRef = rbacv1.RoleRef{
+		},
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     clusterRole,
+		},
+	}
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, rb, func() error {
+		if rolebindingIsUninitialized(rb) {
+			rb.Subjects = []rbacv1.Subject{
+				{
+					Kind:     "Group",
+					APIGroup: "rbac.authorization.k8s.io",
+					Name:     group,
+				},
+			}
+			delete(rb.Labels, LabelRoleBindingUninitialized)
 		}
-		delete(rb.Labels, LabelRoleBindingUninitiliazied)
+		controllerutil.SetControllerReference(&ns, rb, r.Scheme)
 		return nil
 	})
+
 	return err
+}
+
+func rolebindingIsUninitialized(rolebinding *rbacv1.RoleBinding) bool {
+	if rolebinding.Labels == nil {
+		return false
+	}
+	res, err := strconv.ParseBool(rolebinding.Labels[LabelRoleBindingUninitialized])
+	return res && err == nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OrganizationRBACReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Namespace{}).
+		Owns(&rbacv1.RoleBinding{}).
 		Complete(r)
 }
