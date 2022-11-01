@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,14 +53,15 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
+	var err error
 	for rb, cr := range r.DefaultClusterRoles {
-		if err := r.putRoleBinding(ctx, ns, rb, cr, org); err != nil {
-			l.WithValues("rolebinding", rb).Error(err, "unable to create rolebinding")
-			return ctrl.Result{}, err
+		if putErr := r.putRoleBinding(ctx, ns, rb, cr, org); putErr != nil {
+			l.WithValues("rolebinding", rb).Error(putErr, "unable to create rolebinding")
+			r.Recorder.Eventf(&ns, "Warning", "RoleBindingCreationFailed", "Failed to create rolebinding %q", rb)
+			err = multierr.Append(err, putErr)
 		}
 	}
-
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 func (r *OrganizationRBACReconciler) getOrganization(ns corev1.Namespace) string {

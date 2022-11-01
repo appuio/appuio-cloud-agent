@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +19,7 @@ import (
 
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,6 +46,9 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 
 	tcs := map[string]struct {
 		clusterRoles map[string]string
+
+		fail   bool
+		events int
 
 		namespace string
 		nsLabels  map[string]string
@@ -199,6 +205,54 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 				},
 			},
 		},
+		"OrgNs_CreateUpdateKeepAndFail": {
+			clusterRoles: map[string]string{
+				"fail-admib": "fail",
+				"admin":      "admin",
+				"keep":       "bar",
+				"new":        "adminv2",
+			},
+			namespace: "complex",
+			nsLabels: map[string]string{
+				orgLabel: "foo",
+			},
+
+			fail:   true,
+			events: 1,
+
+			roleBindings: []rb{
+				{
+					name:    "admin",
+					roleRef: "admin",
+					groups:  []string{"buzz", "tom"},
+					labels: map[string]string{
+						LabelRoleBindingUninitialized: "true",
+					},
+				},
+				{
+					name:    "keep",
+					roleRef: "bar",
+					groups:  []string{"buzz", "tom", "bob"},
+				},
+			},
+			expected: []rb{
+				{
+					name:    "admin",
+					roleRef: "admin",
+					groups:  []string{"foo"},
+				},
+				{
+					name:    "keep",
+					roleRef: "bar",
+					groups:  []string{"buzz", "tom", "bob"},
+				},
+				{
+					name:    "new",
+					roleRef: "adminv2",
+					groups:  []string{"foo"},
+				},
+			},
+		},
 	}
 
 	for name, tc := range tcs {
@@ -250,13 +304,18 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 					Name: tc.namespace,
 				},
 			})
-			require.NoError(t, err)
+			if tc.fail {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 
 			var foundRBs rbacv1.RoleBindingList
 			err = r.Client.List(context.TODO(), &foundRBs, client.InNamespace(tc.namespace))
 			require.NoError(t, err)
 
 			assert.Len(t, foundRBs.Items, len(tc.expected), "Unexpected number of roleBindings")
+			assert.Len(t, recorder.Events, tc.events, "Unexpected number of events emitted")
 
 			for _, expected := range tc.expected {
 				present := false
@@ -297,10 +356,12 @@ func prepareOranizationRBACTest(t *testing.T, cfg testOrganizationRBACfg) *Organ
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	client := fake.NewClientBuilder().
-		WithScheme(scheme).
-		WithObjects(cfg.obj...).
-		Build()
+	client := failingClient{
+		fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithObjects(cfg.obj...).
+			Build(),
+	}
 
 	if cfg.recorder == nil {
 		cfg.recorder = &record.FakeRecorder{}
@@ -313,4 +374,21 @@ func prepareOranizationRBACTest(t *testing.T, cfg testOrganizationRBACfg) *Organ
 		OrganizationLabel:   cfg.organizationLabel,
 		DefaultClusterRoles: cfg.clusterRoles,
 	}
+}
+
+type failingClient struct {
+	client.WithWatch
+}
+
+func (c failingClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if strings.HasPrefix(obj.GetName(), "fail-") {
+		return apierrors.NewInternalError(errors.New("ups"))
+	}
+	return c.WithWatch.Create(ctx, obj, opts...)
+}
+func (c failingClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	if strings.HasPrefix(obj.GetName(), "fail-") {
+		return apierrors.NewInternalError(errors.New("ups"))
+	}
+	return c.WithWatch.Update(ctx, obj, opts...)
 }
