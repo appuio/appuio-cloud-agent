@@ -155,7 +155,7 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 				},
 			},
 		},
-		"OrgNs_CreatUpdateAndKeep": {
+		"OrgNs_CreateUpdateAndKeep": {
 			clusterRoles: map[string]string{
 				"admin": "admin",
 				"keep":  "bar",
