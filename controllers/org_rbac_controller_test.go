@@ -84,6 +84,30 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 				},
 			},
 		},
+		"OrgNs_CreateMultipleRoles": {
+			clusterRoles: map[string]string{
+				"foo": "admin",
+				"bar": "bar",
+			},
+			namespace: "buzz",
+			nsLabels: map[string]string{
+				orgLabel: "foo",
+			},
+
+			expected: []rb{
+				{
+					name:    "foo",
+					roleRef: "admin",
+					groups:  []string{"foo"},
+				},
+				{
+					name:    "bar",
+					roleRef: "bar",
+					groups:  []string{"foo"},
+				},
+			},
+		},
+
 		"OrgNs_KeepRole": {
 			clusterRoles: defaultCRs,
 			namespace:    "buzz",
@@ -131,6 +155,50 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 				},
 			},
 		},
+		"OrgNs_CreatUpdateAndKeep": {
+			clusterRoles: map[string]string{
+				"admin": "admin",
+				"keep":  "bar",
+				"new":   "adminv2",
+			},
+			namespace: "complex",
+			nsLabels: map[string]string{
+				orgLabel: "foo",
+			},
+
+			roleBindings: []rb{
+				{
+					name:    "admin",
+					roleRef: "admin",
+					groups:  []string{"buzz", "tom"},
+					labels: map[string]string{
+						LabelRoleBindingUninitialized: "true",
+					},
+				},
+				{
+					name:    "keep",
+					roleRef: "bar",
+					groups:  []string{"buzz", "tom", "bob"},
+				},
+			},
+			expected: []rb{
+				{
+					name:    "admin",
+					roleRef: "admin",
+					groups:  []string{"foo"},
+				},
+				{
+					name:    "keep",
+					roleRef: "bar",
+					groups:  []string{"buzz", "tom", "bob"},
+				},
+				{
+					name:    "new",
+					roleRef: "adminv2",
+					groups:  []string{"foo"},
+				},
+			},
+		},
 	}
 
 	for name, tc := range tcs {
@@ -147,8 +215,8 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 			subs := []rbacv1.Subject{}
 			for _, sub := range rb.groups {
 				subs = append(subs, rbacv1.Subject{
-					Kind:     "Group",
-					APIGroup: "rbac.authorization.k8s.io",
+					Kind:     rbacv1.GroupKind,
+					APIGroup: rbacv1.GroupName,
 					Name:     sub,
 				})
 			}
@@ -161,7 +229,7 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 				Subjects: subs,
 				RoleRef: rbacv1.RoleRef{
 					Kind:     "ClusterRole",
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: rbacv1.GroupName,
 					Name:     rb.roleRef,
 				},
 			})

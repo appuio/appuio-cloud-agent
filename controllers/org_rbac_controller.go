@@ -28,6 +28,8 @@ type OrganizationRBACReconciler struct {
 	DefaultClusterRoles map[string]string
 }
 
+// LabelRoleBindingUninitialized is used to mark rolebindings as uninitialized.
+// In that case the controller will update it to bind to the organization.
 const LabelRoleBindingUninitialized = "appuio.io/uninitialized"
 
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
@@ -69,6 +71,7 @@ func (r *OrganizationRBACReconciler) getOrganization(ns corev1.Namespace) string
 }
 
 func (r *OrganizationRBACReconciler) putRoleBinding(ctx context.Context, ns corev1.Namespace, name string, clusterRole string, group string) error {
+
 	rb := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -78,7 +81,7 @@ func (r *OrganizationRBACReconciler) putRoleBinding(ctx context.Context, ns core
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
+			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
 			Name:     clusterRole,
 		},
@@ -87,8 +90,8 @@ func (r *OrganizationRBACReconciler) putRoleBinding(ctx context.Context, ns core
 		if rolebindingIsUninitialized(rb) {
 			rb.Subjects = []rbacv1.Subject{
 				{
-					Kind:     "Group",
-					APIGroup: "rbac.authorization.k8s.io",
+					APIGroup: rbacv1.GroupName,
+					Kind:     rbacv1.GroupKind,
 					Name:     group,
 				},
 			}
