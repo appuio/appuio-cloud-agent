@@ -128,7 +128,7 @@ func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, conf Config) {
 func registerOrganizationRBACController(mgr ctrl.Manager, orgLabel string, defaultClusterRoles map[string]string) {
 	if err := (&controllers.OrganizationRBACReconciler{
 		Client:   mgr.GetClient(),
-		Recorder: mgr.GetEventRecorderFor("resource-ratio-controller"),
+		Recorder: mgr.GetEventRecorderFor("organization-rbac-controller"),
 		Scheme:   mgr.GetScheme(),
 
 		OrganizationLabel:   orgLabel,
