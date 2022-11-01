@@ -36,7 +36,8 @@ const LabelRoleBindingUninitialized = "appuio.io/uninitialized"
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;patch;update
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
-// Reconcile reacts to pod updates and emits events if the fair use request ratio is violated
+// Reconcile makes sure the role bindings for the configured cluster roles are present in every organization namespace.
+// It will also update role bindings with the label "appuio.io/uninitialized": "true" to the default config.
 func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx).WithValues("namespace", req.Name)
 
