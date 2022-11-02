@@ -84,6 +84,7 @@ func main() {
 	}
 
 	registerRatioController(mgr, conf.MemoryPerCoreLimit, conf.OrganizationLabel)
+	registerOrganizationRBACController(mgr, conf.OrganizationLabel, conf.DefaultOrganizationClusterRoles)
 
 	// Currently unused, but will be used for the next kyverno replacements
 	psk := &skipper.PrivilegedUserSkipper{
@@ -122,6 +123,20 @@ func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, conf Config) {
 			DefaultNamespaceNodeSelectorAnnotation: conf.DefaultNamespaceNodeSelectorAnnotation,
 		},
 	})
+}
+
+func registerOrganizationRBACController(mgr ctrl.Manager, orgLabel string, defaultClusterRoles map[string]string) {
+	if err := (&controllers.OrganizationRBACReconciler{
+		Client:   mgr.GetClient(),
+		Recorder: mgr.GetEventRecorderFor("organization-rbac-controller"),
+		Scheme:   mgr.GetScheme(),
+
+		OrganizationLabel:   orgLabel,
+		DefaultClusterRoles: defaultClusterRoles,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ratio")
+		os.Exit(1)
+	}
 }
 
 func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) {

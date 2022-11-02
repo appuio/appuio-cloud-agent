@@ -29,6 +29,10 @@ type Config struct {
 	DefaultNodeSelector map[string]string
 	// DefaultNamespaceNodeSelectorAnnotation is the annotation used to set the default node selector for pods in this namespace
 	DefaultNamespaceNodeSelectorAnnotation string
+
+	// DefaultOrganizationClusterRoles is a map containing the configuration for rolebindings that are created by default in each organization namespace.
+	// The keys are the name of default rolebindings to create and the values are the names of the clusterroles they bind to.
+	DefaultOrganizationClusterRoles map[string]string
 }
 
 func ConfigFromFile(path string) (Config, error) {
