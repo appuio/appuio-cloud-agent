@@ -37,6 +37,9 @@ const LabelRoleBindingUninitialized = "appuio.io/uninitialized"
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;patch;update
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
+// We don't actually want or need to set finalizers, but if "OwnerReferencesPermissionEnforcement" is enabled we need this permission to set an owner reference to a namespace
+//+kubebuilder:rbac:groups="",resources=namespaces/finalizers,verbs=update
+
 // Reconcile makes sure the role bindings for the configured cluster roles are present in every organization namespace.
 // It will also update role bindings with the label "appuio.io/uninitialized": "true" to the default config.
 func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -100,8 +103,7 @@ func (r *OrganizationRBACReconciler) putRoleBinding(ctx context.Context, ns core
 			}
 			delete(rb.Labels, LabelRoleBindingUninitialized)
 		}
-		controllerutil.SetControllerReference(&ns, rb, r.Scheme)
-		return nil
+		return controllerutil.SetControllerReference(&ns, rb, r.Scheme)
 	})
 
 	return err
