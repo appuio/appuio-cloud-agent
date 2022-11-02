@@ -53,15 +53,15 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-	var err error
+	var errs []error
 	for rb, cr := range r.DefaultClusterRoles {
-		if putErr := r.putRoleBinding(ctx, ns, rb, cr, org); putErr != nil {
-			l.WithValues("rolebinding", rb).Error(putErr, "unable to create rolebinding")
+		if err := r.putRoleBinding(ctx, ns, rb, cr, org); err != nil {
+			l.WithValues("rolebinding", rb).Error(err, "unable to create rolebinding")
 			r.Recorder.Eventf(&ns, "Warning", "RoleBindingCreationFailed", "Failed to create rolebinding %q", rb)
-			err = multierr.Append(err, putErr)
+			errs = append(errs, err)
 		}
 	}
-	return ctrl.Result{}, err
+	return ctrl.Result{}, multierr.Combine(errs...)
 }
 
 func (r *OrganizationRBACReconciler) getOrganization(ns corev1.Namespace) string {
