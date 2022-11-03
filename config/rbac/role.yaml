@@ -23,6 +23,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - pods
   verbs:
   - get
