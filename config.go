@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/appuio/appuio-cloud-agent/limits"
 	"go.uber.org/multierr"
 	"sigs.k8s.io/yaml"
 )
@@ -12,8 +13,9 @@ type Config struct {
 	// OrganizationLabel is the label used to mark namespaces to belong to an organization
 	OrganizationLabel string
 
-	// MemoryPerCoreLimit is the fair use limit of memory usage per CPU core
-	MemoryPerCoreLimit string
+	// MemoryPerCoreLimits is the fair use limit of memory usage per CPU core
+	// It is possible to select limits by node selector labels
+	MemoryPerCoreLimits limits.Limits
 
 	// Privileged* is a list of the given type allowed to bypass restrictions.
 	// Wildcards are supported (e.g. "system:serviceaccount:default:*" or "cluster-*-operator").
@@ -49,9 +51,6 @@ func (c Config) Validate() error {
 
 	if c.OrganizationLabel == "" {
 		errs = append(errs, errors.New("OrganizationLabel must not be empty"))
-	}
-	if c.MemoryPerCoreLimit == "" {
-		errs = append(errs, errors.New("MemoryPerCoreLimit must not be empty"))
 	}
 
 	return multierr.Combine(errs...)

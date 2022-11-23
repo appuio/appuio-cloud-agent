@@ -8,6 +8,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -324,4 +325,20 @@ func TestFormatLabel(t *testing.T) {
 
 	assert.Equal(t, "a=a,b=b", labels.Set{"b": "b", "a": "a"}.AsSelector().String())
 	assert.Equal(t, "", labels.Set{}.AsSelector().String())
+}
+
+func TestMatchExpression(t *testing.T) {
+	lblSel := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "foo",
+				Operator: metav1.LabelSelectorOpDoesNotExist,
+			},
+		},
+	}
+	selector, err := metav1.LabelSelectorAsSelector(&lblSel)
+	assert.NoError(t, err)
+
+	assert.True(t, selector.Matches(labels.Set{"bar": "baz"}))
+	assert.False(t, selector.Matches(labels.Set{"foo": "baz"}))
 }

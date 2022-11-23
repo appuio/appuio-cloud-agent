@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/appuio/appuio-cloud-agent/limits"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -169,7 +170,11 @@ func prepareRatioTest(t *testing.T, cfg testRatioCfg) *RatioReconciler {
 				Memory: cfg.fetchMemory.AsDec(),
 			},
 			}},
-		RatioLimit: &cfg.limit,
+		RatioLimits: limits.Limits{
+			{
+				Limit: &cfg.limit,
+			},
+		},
 	}
 }
 

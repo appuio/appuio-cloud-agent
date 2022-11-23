@@ -6,17 +6,17 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/appuio/appuio-cloud-agent/ratio"
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/appuio/appuio-cloud-agent/limits"
+	"github.com/appuio/appuio-cloud-agent/ratio"
 )
 
 // +kubebuilder:webhook:path=/validate-request-ratio,name=validate-request-ratio.appuio.io,admissionReviewVersions=v1,sideEffects=none,mutating=false,failurePolicy=ignore,groups=*,resources=*,verbs=create;update,versions=*,matchPolicy=equivalent
@@ -28,8 +28,8 @@ import (
 type RatioValidator struct {
 	decoder *admission.Decoder
 
-	Ratio      ratioFetcher
-	RatioLimit *resource.Quantity
+	Ratio       ratioFetcher
+	RatioLimits limits.Limits
 }
 
 type ratioFetcher interface {
@@ -89,9 +89,19 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 
 	warnings := make([]string, 0, len(ratios))
 	for nodeSel, r := range ratios {
-		if r.Below(*v.RatioLimit) {
+		sel, err := labels.ConvertSelectorToLabelsMap(nodeSel)
+		if err != nil {
+			return errored(http.StatusInternalServerError, err)
+		}
+		limit := v.RatioLimits.GetLimitForNodeSelector(sel)
+		if limit == nil {
+			l.Info("no limit found for node selector", "nodeSelector", nodeSel)
+			continue
+		}
+
+		if r.Below(*limit) {
 			l.Info("ratio too low", "node_selector", nodeSel, "ratio", r)
-			warnings = append(warnings, r.Warn(v.RatioLimit))
+			warnings = append(warnings, r.Warn(limit))
 		}
 	}
 

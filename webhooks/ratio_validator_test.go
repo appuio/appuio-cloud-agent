@@ -21,6 +21,7 @@ import (
 
 	"testing"
 
+	"github.com/appuio/appuio-cloud-agent/limits"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -247,7 +248,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			v := prepareTest(t, tc.resources...)
 			limit := resource.MustParse(tc.limit)
-			v.RatioLimit = &limit
+			v.RatioLimits = limits.Limits{{Limit: &limit}}
 
 			ar := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{

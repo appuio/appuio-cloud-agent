@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -15,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/appuio/appuio-cloud-agent/controllers"
+	"github.com/appuio/appuio-cloud-agent/limits"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/appuio/appuio-cloud-agent/skipper"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
@@ -83,7 +83,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	registerRatioController(mgr, conf.MemoryPerCoreLimit, conf.OrganizationLabel)
+	registerRatioController(mgr, conf.MemoryPerCoreLimits, conf.OrganizationLabel)
 	registerOrganizationRBACController(mgr, conf.OrganizationLabel, conf.DefaultOrganizationClusterRoles)
 
 	// Currently unused, but will be used for the next kyverno replacements
@@ -139,15 +139,10 @@ func registerOrganizationRBACController(mgr ctrl.Manager, orgLabel string, defau
 	}
 }
 
-func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) {
-	limit, err := resource.ParseQuantity(memoryCPURatio)
-	if err != nil {
-		setupLog.Error(err, "unable to parse memory-per-core-limit")
-		os.Exit(1)
-	}
+func registerRatioController(mgr ctrl.Manager, memoryCPURatios limits.Limits, orgLabel string) {
 	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
 		Handler: &webhooks.RatioValidator{
-			RatioLimit: &limit,
+			RatioLimits: memoryCPURatios,
 			Ratio: &ratio.Fetcher{
 				Client: mgr.GetClient(),
 			},
@@ -155,10 +150,10 @@ func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) 
 	})
 
 	if err := (&controllers.RatioReconciler{
-		Client:     mgr.GetClient(),
-		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
-		Scheme:     mgr.GetScheme(),
-		RatioLimit: &limit,
+		Client:      mgr.GetClient(),
+		Recorder:    mgr.GetEventRecorderFor("resource-ratio-controller"),
+		Scheme:      mgr.GetScheme(),
+		RatioLimits: memoryCPURatios,
 		Ratio: &ratio.Fetcher{
 			Client:            mgr.GetClient(),
 			OrganizationLabel: orgLabel,
