@@ -8,6 +8,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestRatio_Record(t *testing.T) {
@@ -311,4 +312,16 @@ func FuzzRatio(f *testing.F) {
 			r.Below(lim)
 		})
 	})
+}
+
+func TestFormatLabel(t *testing.T) {
+	assert.Equal(t, "a=a,b=b", labels.FormatLabels(map[string]string{"b": "b", "a": "a"}))
+	assert.Equal(t, "<none>", labels.FormatLabels(nil))
+	assert.Equal(t, "<none>", labels.FormatLabels(map[string]string{}))
+
+	assert.Equal(t, "a=a,b=b", labels.Set{"b": "b", "a": "a"}.String())
+	assert.Equal(t, "", labels.Set{}.String())
+
+	assert.Equal(t, "a=a,b=b", labels.Set{"b": "b", "a": "a"}.AsSelector().String())
+	assert.Equal(t, "", labels.Set{}.AsSelector().String())
 }

@@ -439,10 +439,6 @@ func newTestContainers(res []containerResources) []corev1.Container {
 	return containers
 }
 
-type deployResource struct {
-	containers []containerResources
-	replicas   int32
-}
 type podResource []containerResources
 type containerResources struct {
 	cpu    string

@@ -38,19 +38,21 @@ var (
 
 func TestRatioValidator_Handle(t *testing.T) {
 	ctx := context.Background()
+	type testRatio map[string]struct {
+		cpu    string
+		memory string
+	}
 	tests := map[string]struct {
 		namespace string
 		objects   []client.Object
 		orgLabel  string
-		memory    string
-		cpu       string
+		ratios    testRatio
 		err       error
 		errCheck  func(err error) bool
 	}{
 		"Fetch_EmptyNamespace": {
 			namespace: "foo",
-			memory:    "0",
-			cpu:       "0",
+			ratios:    testRatio{},
 		},
 		"Fetch_Namespace": {
 			namespace: "foo",
@@ -59,8 +61,40 @@ func TestRatioValidator_Handle(t *testing.T) {
 				foo2Pod,
 				foobarPod,
 			},
-			memory: "3Gi",
-			cpu:    "3",
+			ratios: testRatio{"": {
+				memory: "3Gi",
+				cpu:    "3",
+			}},
+		},
+		"Fetch_WithDifferentNodeSelector": {
+			namespace: "foo",
+			objects: []client.Object{
+				tap(fooPod, func(p *corev1.Pod) *corev1.Pod {
+					p.Spec.NodeSelector = map[string]string{"class": "mega"}
+					return p
+				}),
+				foo2Pod,
+				tap(foo2Pod, func(p *corev1.Pod) *corev1.Pod {
+					p.ObjectMeta.Name = "foo3"
+					p.Spec.NodeSelector = map[string]string{"class": "huge"}
+					return p
+				}),
+				foobarPod,
+			},
+			ratios: testRatio{
+				"": {
+					memory: "1Gi",
+					cpu:    "0",
+				},
+				"class=huge": {
+					memory: "1Gi",
+					cpu:    "0",
+				},
+				"class=mega": {
+					memory: "2Gi",
+					cpu:    "3",
+				},
+			},
 		},
 		"Fetch_NotExists": {
 			namespace: "not-exist",
@@ -79,8 +113,10 @@ func TestRatioValidator_Handle(t *testing.T) {
 				foo2Pod,
 				foobarPod,
 			},
-			memory: "1337Gi",
-			cpu:    "0",
+			ratios: testRatio{"": {
+				memory: "1337Gi",
+				cpu:    "0",
+			}},
 		},
 		"Fetch_WronglyDisabledNamespace": {
 			namespace: "notdisabled-bar",
@@ -94,8 +130,10 @@ func TestRatioValidator_Handle(t *testing.T) {
 					phase: corev1.PodRunning,
 				}),
 			},
-			memory: "1337Gi",
-			cpu:    "0",
+			ratios: testRatio{"": {
+				memory: "1337Gi",
+				cpu:    "0",
+			}},
 		},
 
 		"Fetch_DisabledNamespace": {
@@ -166,29 +204,36 @@ func TestRatioValidator_Handle(t *testing.T) {
 				}),
 				foobarPod,
 			},
-			memory: "3Gi",
-			cpu:    "3",
+			ratios: testRatio{"": {
+				memory: "3Gi",
+				cpu:    "3",
+			}},
 		},
 	}
 
-	for _, tc := range tests {
-		r, err := prepareTest(t, testCfg{
-			initObjs: tc.objects,
-			orgLabel: tc.orgLabel,
-		}).FetchRatio(ctx, tc.namespace)
-		if tc.err == nil {
-			require.NoError(t, err)
-			cpu := resource.MustParse(tc.cpu)
-			mem := resource.MustParse(tc.memory)
-			assert.Equal(t, *cpu.AsDec(), *r.CPU, "cpu requests equal")
-			assert.Equal(t, *mem.AsDec(), *r.Memory, "memory requests equal")
-		} else {
-			if tc.errCheck != nil {
-				require.Truef(t, tc.errCheck(err), "Unexpected error")
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			r, err := prepareTest(t, testCfg{
+				initObjs: tc.objects,
+				orgLabel: tc.orgLabel,
+			}).FetchRatios(ctx, tc.namespace)
+			if tc.err == nil {
+				require.NoError(t, err)
+				require.Len(t, r, len(tc.ratios))
+				for nodeSel, ratio := range tc.ratios {
+					cpu := resource.MustParse(ratio.cpu)
+					mem := resource.MustParse(ratio.memory)
+					assert.Equal(t, *cpu.AsDec(), *r[nodeSel].CPU, "cpu requests should be equal for node selector %q", nodeSel)
+					assert.Equal(t, *mem.AsDec(), *r[nodeSel].Memory, "memory requests should be equal for node selector %q", nodeSel)
+				}
 			} else {
-				require.ErrorIs(t, err, tc.err)
+				if tc.errCheck != nil {
+					require.Truef(t, tc.errCheck(err), "Unexpected error")
+				} else {
+					require.ErrorIs(t, err, tc.err)
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -233,4 +278,10 @@ func prepareTest(t *testing.T, cfg testCfg) Fetcher {
 		Client:            failingClient{client},
 		OrganizationLabel: cfg.orgLabel,
 	}
+}
+
+// tap deep copies the given object and allows to modify it using the given function
+func tap[T runtime.Object](t T, f func(T) T) T {
+	ct := t.DeepCopyObject().(T)
+	return f(ct)
 }

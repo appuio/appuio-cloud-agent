@@ -26,7 +26,7 @@ type RatioReconciler struct {
 }
 
 type ratioFetcher interface {
-	FetchRatio(ctx context.Context, ns string) (*ratio.Ratio, error)
+	FetchRatios(ctx context.Context, ns string) (map[string]*ratio.Ratio, error)
 }
 
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
@@ -38,7 +38,7 @@ var eventReason = "TooMuchCPURequest"
 func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx).WithValues("namespace", req.Namespace, "name", req.Name)
 
-	nsRatio, err := r.Ratio.FetchRatio(ctx, req.Namespace)
+	nsRatios, err := r.Ratio.FetchRatios(ctx, req.Namespace)
 	if err != nil {
 		if errors.Is(err, ratio.ErrorDisabled) {
 			l.V(1).Info("namespace disabled")
@@ -48,14 +48,18 @@ func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	if nsRatio.Below(*r.RatioLimit) {
-		l.Info("recording warn event: ratio too low")
+	for nodeSel, ratio := range nsRatios {
+		// TODO() add nodeSel to warning message
+		_ = nodeSel
+		if ratio.Below(*r.RatioLimit) {
+			l.Info("recording warn event: ratio too low")
 
-		if err := r.warnPod(ctx, req.Name, req.Namespace, nsRatio); err != nil {
-			l.Error(err, "failed to record event on pod")
-		}
-		if err := r.warnNamespace(ctx, req.Namespace, nsRatio); err != nil {
-			l.Error(err, "failed to record event on namespace")
+			if err := r.warnPod(ctx, req.Name, req.Namespace, ratio); err != nil {
+				l.Error(err, "failed to record event on pod")
+			}
+			if err := r.warnNamespace(ctx, req.Namespace, ratio); err != nil {
+				l.Error(err, "failed to record event on namespace")
+			}
 		}
 	}
 
