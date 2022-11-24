@@ -6,6 +6,7 @@ import (
 
 	"github.com/appuio/appuio-cloud-agent/limits"
 	"go.uber.org/multierr"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/yaml"
 )
 
@@ -13,6 +14,10 @@ type Config struct {
 	// OrganizationLabel is the label used to mark namespaces to belong to an organization
 	OrganizationLabel string
 
+	// MemoryPerCoreLimit is the fair use limit of memory usage per CPU core
+	// it is deprecated and will be removed in a future version.
+	// Use MemoryPerCoreLimits: {Limit: "XGi"} instead.
+	MemoryPerCoreLimit *resource.Quantity
 	// MemoryPerCoreLimits is the fair use limit of memory usage per CPU core
 	// It is possible to select limits by node selector labels
 	MemoryPerCoreLimits limits.Limits
@@ -37,13 +42,18 @@ type Config struct {
 	DefaultOrganizationClusterRoles map[string]string
 }
 
-func ConfigFromFile(path string) (Config, error) {
+func ConfigFromFile(path string) (c Config, warn []string, err error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return Config{}, err
+		return Config{}, nil, err
 	}
-	var c Config
-	return c, yaml.Unmarshal(raw, &c, yaml.DisallowUnknownFields)
+	err = yaml.Unmarshal(raw, &c, yaml.DisallowUnknownFields)
+	if err != nil {
+		return Config{}, nil, err
+	}
+
+	c, warnings := migrateConfig(c)
+	return c, warnings, nil
 }
 
 func (c Config) Validate() error {
@@ -54,4 +64,19 @@ func (c Config) Validate() error {
 	}
 
 	return multierr.Combine(errs...)
+}
+
+func migrateConfig(c Config) (Config, []string) {
+	warnings := make([]string, 0)
+
+	if c.MemoryPerCoreLimit != nil && c.MemoryPerCoreLimits == nil {
+		warnings = append(warnings, "MemoryPerCoreLimit is deprecated and will be removed in a future version. Use MemoryPerCoreLimits: {Limit: \"XGi\"} instead.")
+		c.MemoryPerCoreLimits = limits.Limits{
+			{
+				Limit: c.MemoryPerCoreLimit,
+			},
+		}
+	}
+
+	return c, warnings
 }

@@ -56,10 +56,13 @@ func main() {
 	flag.Parse()
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	conf, err := ConfigFromFile(*configFilePath)
+	conf, warnings, err := ConfigFromFile(*configFilePath)
 	if err != nil {
 		setupLog.Error(err, "unable to read config file")
 		os.Exit(1)
+	}
+	for _, warning := range warnings {
+		setupLog.Info("WARNING " + warning)
 	}
 	if err := conf.Validate(); err != nil {
 		setupLog.Error(err, "invalid configuration")
