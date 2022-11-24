@@ -119,7 +119,7 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 
 		if r.Below(*limit) {
 			l.Info("ratio too low", "node_selector", nodeSel, "ratio", r)
-			warnings = append(warnings, r.Warn(limit))
+			warnings = append(warnings, r.Warn(limit, nodeSel))
 		}
 	}
 

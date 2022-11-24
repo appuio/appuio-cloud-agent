@@ -52,8 +52,6 @@ func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	for nodeSel, ratio := range nsRatios {
-		// TODO() add nodeSel to warning message
-
 		sel, err := labels.ConvertSelectorToLabelsMap(nodeSel)
 		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to convert node selector '%s' to labels map: %w", nodeSel, err)
@@ -67,10 +65,10 @@ func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		if ratio.Below(*limit) {
 			l.Info("recording warn event: ratio too low")
 
-			if err := r.warnPod(ctx, req.Name, req.Namespace, ratio, limit); err != nil {
+			if err := r.warnPod(ctx, req.Name, req.Namespace, ratio, nodeSel, limit); err != nil {
 				l.Error(err, "failed to record event on pod")
 			}
-			if err := r.warnNamespace(ctx, req.Namespace, ratio, limit); err != nil {
+			if err := r.warnNamespace(ctx, req.Namespace, ratio, nodeSel, limit); err != nil {
 				l.Error(err, "failed to record event on namespace")
 			}
 		}
@@ -79,7 +77,7 @@ func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
-func (r *RatioReconciler) warnPod(ctx context.Context, name, namespace string, nsRatio *ratio.Ratio, limit *resource.Quantity) error {
+func (r *RatioReconciler) warnPod(ctx context.Context, name, namespace string, nsRatio *ratio.Ratio, sel string, limit *resource.Quantity) error {
 	pod := corev1.Pod{}
 	err := r.Get(ctx, client.ObjectKey{
 		Namespace: namespace,
@@ -88,10 +86,10 @@ func (r *RatioReconciler) warnPod(ctx context.Context, name, namespace string, n
 	if err != nil {
 		return err
 	}
-	r.Recorder.Event(&pod, "Warning", eventReason, nsRatio.Warn(limit))
+	r.Recorder.Event(&pod, "Warning", eventReason, nsRatio.Warn(limit, sel))
 	return nil
 }
-func (r *RatioReconciler) warnNamespace(ctx context.Context, name string, nsRatio *ratio.Ratio, limit *resource.Quantity) error {
+func (r *RatioReconciler) warnNamespace(ctx context.Context, name string, nsRatio *ratio.Ratio, sel string, limit *resource.Quantity) error {
 	ns := corev1.Namespace{}
 	err := r.Get(ctx, client.ObjectKey{
 		Name: name,
@@ -99,7 +97,7 @@ func (r *RatioReconciler) warnNamespace(ctx context.Context, name string, nsRati
 	if err != nil {
 		return err
 	}
-	r.Recorder.Event(&ns, "Warning", eventReason, nsRatio.Warn(limit))
+	r.Recorder.Event(&ns, "Warning", eventReason, nsRatio.Warn(limit, sel))
 	return nil
 }
 

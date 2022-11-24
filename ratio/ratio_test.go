@@ -288,9 +288,11 @@ func TestRatio_Warn(t *testing.T) {
 		CPU:    cpu.AsDec(),
 		Memory: memory.AsDec(),
 	}
-	assert.Contains(t, r.Warn(nil), "1Gi")
+	assert.Contains(t, r.Warn(nil, ""), "1Gi")
 	lim := resource.MustParse("1Mi")
-	assert.Contains(t, r.Warn(&lim), "1Mi")
+	assert.Contains(t, r.Warn(&lim, ""), "1Mi")
+
+	assert.Contains(t, r.Warn(&lim, "class=x"), "class=x")
 }
 
 func FuzzRatio(f *testing.F) {
@@ -305,7 +307,7 @@ func FuzzRatio(f *testing.F) {
 				Memory: memQuant.AsDec(),
 			}
 			lim := resource.MustParse(fmt.Sprintf("%dMi", limit))
-			out := r.Warn(&lim)
+			out := r.Warn(&lim, "")
 			assert.NotEmpty(t, out)
 
 			r.Below(lim)

@@ -102,9 +102,13 @@ func (r Ratio) String() string {
 }
 
 // Warn returns a warning string explaining that the ratio is not considered fair use
-func (r Ratio) Warn(limit *resource.Quantity) string {
+func (r Ratio) Warn(limit *resource.Quantity, nodeSelector string) string {
 	// WARNING(glrf) Warnings MUST NOT contain newlines. K8s will simply drop your warning if you add newlines.
-	w := fmt.Sprintf("Current memory to CPU ratio of %s/core in this namespace is below the fair use ratio", r.String())
+	w := fmt.Sprintf("Current memory to CPU ratio of %s/core", r.String())
+	if nodeSelector != "" {
+		w = fmt.Sprintf("%s for node type %q", w, nodeSelector)
+	}
+	w = fmt.Sprintf("%s in this namespace is below the fair use ratio", w)
 	if limit != nil {
 		w = fmt.Sprintf("%s of %s/core", w, limit)
 	}
