@@ -40,7 +40,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 		object       client.Object
 		mangleObject bool
 		create       bool
-		limit        string
+		limits       limits.Limits
 		warn         bool
 		fail         bool
 		statusCode   int32
@@ -49,7 +49,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 		"Allow_EmptyNamespace": {
 			user:      "appuio#foo",
 			namespace: "foo",
-			limit:     "4Gi",
+			limits:    limits.Limits{{Limit: requireParseQuantity(t, "4Gi")}},
 			warn:      false,
 		},
 		"Allow_FairNamespace": {
@@ -66,8 +66,8 @@ func TestRatioValidator_Handle(t *testing.T) {
 					{cpu: "5", memory: "1Gi"},
 				}),
 			},
-			limit: "4Gi",
-			warn:  false,
+			limits: limits.Limits{{Limit: requireParseQuantity(t, "4Gi")}},
+			warn:   false,
 		},
 		"Warn_UnfairNamespace": {
 			user:      "appuio#foo",
@@ -83,8 +83,31 @@ func TestRatioValidator_Handle(t *testing.T) {
 					{cpu: "8", memory: "1Gi"},
 				}),
 			},
-			limit: "1Gi",
-			warn:  true,
+			limits: limits.Limits{{Limit: requireParseQuantity(t, "1Gi")}},
+			warn:   true,
+		},
+		"Warn_UnfairNamespace_Selectors": {
+			user:      "appuio#foo",
+			namespace: "foo",
+			resources: []client.Object{
+				podFromResources("fair", "foo", podResource{
+					{cpu: "1", memory: "4Gi"},
+				}, func(p *corev1.Pod) {
+					p.Spec.NodeSelector = map[string]string{"class": "foo"}
+				}),
+				podFromResources("unfair", "foo", podResource{
+					{cpu: "2", memory: "1Gi"},
+				}, func(p *corev1.Pod) {
+					p.Spec.NodeSelector = map[string]string{"class": "bar"}
+				}),
+			},
+			limits: limits.Limits{{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"class": "bar"},
+				},
+				Limit: requireParseQuantity(t, "1Gi"),
+			}},
+			warn: true,
 		},
 		"Allow_DisabledUnfairNamespace": {
 			user:      "appuio#foo",
@@ -94,8 +117,8 @@ func TestRatioValidator_Handle(t *testing.T) {
 					{cpu: "8", memory: "1Gi"},
 				}),
 			},
-			limit: "1Gi",
-			warn:  false,
+			limits: limits.Limits{{Limit: requireParseQuantity(t, "1Gi")}},
+			warn:   false,
 		},
 		"Allow_LowercaseDisabledUnfairNamespace": {
 			user:      "appuio#foo",
@@ -105,8 +128,8 @@ func TestRatioValidator_Handle(t *testing.T) {
 					{cpu: "8", memory: "1Gi"},
 				}),
 			},
-			limit: "1Gi",
-			warn:  false,
+			limits: limits.Limits{{Limit: requireParseQuantity(t, "1Gi")}},
+			warn:   false,
 		},
 
 		"Allow_ServiceAccount": {
@@ -123,8 +146,8 @@ func TestRatioValidator_Handle(t *testing.T) {
 					{cpu: "8", memory: "1Gi"},
 				}),
 			},
-			limit: "1Gi",
-			warn:  false,
+			limits: limits.Limits{{Limit: requireParseQuantity(t, "1Gi")}},
+			warn:   false,
 		},
 		"ListFailure": {
 			user:      "bar",
@@ -141,7 +164,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 					{cpu: "8", memory: "1Gi"},
 				}),
 			},
-			limit:      "1Gi",
+			limits:     limits.Limits{{Limit: requireParseQuantity(t, "1Gi")}},
 			warn:       false,
 			fail:       true,
 			statusCode: http.StatusInternalServerError,
@@ -150,7 +173,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 			user:       "bar",
 			namespace:  "notexits",
 			resources:  []client.Object{},
-			limit:      "1Gi",
+			limits:     limits.Limits{{Limit: requireParseQuantity(t, "1Gi")}},
 			warn:       false,
 			fail:       true,
 			statusCode: http.StatusNotFound,
@@ -170,7 +193,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 			object: podFromResources("unfair", "foo", podResource{
 				{cpu: "8", memory: "1Gi"},
 			}),
-			limit:  "4Gi",
+			limits: limits.Limits{{Limit: requireParseQuantity(t, "4Gi")}},
 			warn:   true,
 			create: true,
 		},
@@ -182,24 +205,62 @@ func TestRatioValidator_Handle(t *testing.T) {
 				{cpu: "8", memory: "1Gi"},
 			}),
 			mangleObject: true,
-			limit:        "4Gi",
+			limits:       limits.Limits{{Limit: requireParseQuantity(t, "4Gi")}},
 			warn:         false,
 			create:       true,
 			fail:         true,
 			statusCode:   http.StatusBadRequest,
 		},
-		"Warn_ConsiderNewDeployment": {
+		"Warn_ConsiderNewDeployment_EmptyNS": {
+			user:      "appuio#foo",
+			namespace: "foo",
+			resources: []client.Object{},
+			object: deploymentFromResources("unfair", "foo", 2, podResource{
+				{cpu: "2", memory: "1Gi"},
+			}),
+			limits: limits.Limits{{
+				Limit: requireParseQuantity(t, "1Gi"),
+			}},
+			warn:   true,
+			create: true,
+		},
+		"Warn_ConsiderNewDeployment_NodeSelectorFromNamespace": {
+			user:      "appuio#foo",
+			namespace: "ns-with-default-node-selector",
+			resources: []client.Object{},
+			object: deploymentFromResources("ns-with-default-node-selector", "foo", 2, podResource{
+				{cpu: "2", memory: "1Gi"},
+			}),
+			limits: limits.Limits{{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"class": "plus"},
+				},
+				Limit: requireParseQuantity(t, "1Gi"),
+			}},
+			warn:   true,
+			create: true,
+		},
+		"Warn_ConsiderNewDeployment_FuzzyMatchNodeSelector": {
 			user:      "appuio#foo",
 			namespace: "foo",
 			resources: []client.Object{
 				podFromResources("pod1", "foo", podResource{
-					{cpu: "0", memory: "4Gi"},
+					{cpu: "1", memory: "1Gi"},
+				}, func(p *corev1.Pod) {
+					p.Spec.NodeSelector = map[string]string{"app": "true", "class": "foo"}
 				}),
 			},
 			object: deploymentFromResources("unfair", "foo", 2, podResource{
-				{cpu: "1", memory: "1Gi"},
+				{cpu: "2", memory: "1Gi"},
+			}, func(d *appsv1.Deployment) {
+				d.Spec.Template.Spec.NodeSelector = map[string]string{"class": "foo"}
 			}),
-			limit:  "4Gi",
+			limits: limits.Limits{{
+				NodeSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "true"},
+				},
+				Limit: requireParseQuantity(t, "1Gi"),
+			}},
 			warn:   true,
 			create: true,
 		},
@@ -209,7 +270,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 			resources:    []client.Object{},
 			object:       deploymentFromResources("unfair", "foo", 2, podResource{}),
 			mangleObject: true,
-			limit:        "4Gi",
+			limits:       limits.Limits{{Limit: requireParseQuantity(t, "4Gi")}},
 			warn:         false,
 			create:       true,
 			fail:         true,
@@ -226,7 +287,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 			object: statefulsetFromResources("unfair", "foo", 2, podResource{
 				{cpu: "1", memory: "1Gi"},
 			}),
-			limit:  "4Gi",
+			limits: limits.Limits{{Limit: requireParseQuantity(t, "4Gi")}},
 			warn:   true,
 			create: true,
 		},
@@ -236,7 +297,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 			resources:    []client.Object{},
 			object:       statefulsetFromResources("unfair", "foo", 2, podResource{}),
 			mangleObject: true,
-			limit:        "4Gi",
+			limits:       limits.Limits{{Limit: requireParseQuantity(t, "4Gi")}},
 			warn:         false,
 			create:       true,
 			fail:         true,
@@ -245,10 +306,12 @@ func TestRatioValidator_Handle(t *testing.T) {
 	}
 
 	for name, tc := range tests {
+		name, tc := name, tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			v := prepareTest(t, tc.resources...)
-			limit := resource.MustParse(tc.limit)
-			v.RatioLimits = limits.Limits{{Limit: &limit}}
+			v.RatioLimits = tc.limits
 
 			ar := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -316,6 +379,8 @@ func TestRatioValidator_Handle(t *testing.T) {
 }
 
 func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
+	const defaultNodeSelectorAnnotation = "test.io/node-selector"
+
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -335,13 +400,22 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 		ratio.RatioValidatiorDisableAnnotation: "true",
 	}
 
-	initObjs = append(initObjs, testNamespace("foo"), barNs, disabledNs, otherDisabledNs)
+	nsWithDefaultNodeSelector := testNamespace("ns-with-default-node-selector")
+	nsWithDefaultNodeSelector.Annotations = map[string]string{
+		defaultNodeSelectorAnnotation: "class=plus",
+	}
+
+	initObjs = append(initObjs, testNamespace("foo"), barNs, disabledNs, otherDisabledNs, nsWithDefaultNodeSelector)
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(initObjs...).
 		Build()
 
 	uv := &RatioValidator{
+		DefaultNamespaceNodeSelectorAnnotation: defaultNodeSelectorAnnotation,
+
+		Client: failingClient{client},
+
 		Ratio: ratio.Fetcher{
 			Client: failingClient{client},
 		},
@@ -358,7 +432,7 @@ func testNamespace(name string) *corev1.Namespace {
 	}
 }
 
-func podFromResources(name, namespace string, res podResource) *corev1.Pod {
+func podFromResources(name, namespace string, res podResource, modify ...func(*corev1.Pod)) *corev1.Pod {
 	p := corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -387,10 +461,15 @@ func podFromResources(name, namespace string, res podResource) *corev1.Pod {
 		}
 		p.Spec.Containers = append(p.Spec.Containers, c)
 	}
+
+	for _, m := range modify {
+		m(&p)
+	}
+
 	return &p
 }
 
-func deploymentFromResources(name, namespace string, replicas int32, res podResource) *appsv1.Deployment {
+func deploymentFromResources(name, namespace string, replicas int32, res podResource, modify ...func(*appsv1.Deployment)) *appsv1.Deployment {
 	deploy := appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -403,9 +482,15 @@ func deploymentFromResources(name, namespace string, replicas int32, res podReso
 	}
 	deploy.Spec.Replicas = &replicas
 	deploy.Spec.Template.Spec.Containers = newTestContainers(res)
+
+	for _, m := range modify {
+		m(&deploy)
+	}
+
 	return &deploy
 }
-func statefulsetFromResources(name, namespace string, replicas int32, res podResource) *appsv1.StatefulSet {
+
+func statefulsetFromResources(name, namespace string, replicas int32, res podResource, modify ...func(*appsv1.StatefulSet)) *appsv1.StatefulSet {
 	sts := appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
@@ -418,6 +503,11 @@ func statefulsetFromResources(name, namespace string, replicas int32, res podRes
 	}
 	sts.Spec.Replicas = &replicas
 	sts.Spec.Template.Spec.Containers = newTestContainers(res)
+
+	for _, m := range modify {
+		m(&sts)
+	}
+
 	return &sts
 }
 
@@ -459,4 +549,11 @@ func (c failingClient) List(ctx context.Context, list client.ObjectList, opts ..
 		return apierrors.NewInternalError(errors.New("ups"))
 	}
 	return c.WithWatch.List(ctx, list, opts...)
+}
+
+func requireParseQuantity(t *testing.T, s string) *resource.Quantity {
+	t.Helper()
+	q, err := resource.ParseQuantity(s)
+	require.NoError(t, err)
+	return &q
 }

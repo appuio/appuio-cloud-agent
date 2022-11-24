@@ -3,11 +3,12 @@ package limits_test
 import (
 	"testing"
 
-	"github.com/appuio/appuio-cloud-agent/limits"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/appuio/appuio-cloud-agent/limits"
 )
 
 func TestGetLimitForNodeSelector(t *testing.T) {

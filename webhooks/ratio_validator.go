@@ -12,6 +12,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -27,9 +28,15 @@ import (
 // RatioValidator checks for every action in a namespace whether the Memory to CPU ratio limit is exceeded and will return a warning if it is.
 type RatioValidator struct {
 	decoder *admission.Decoder
+	Client  client.Client
 
 	Ratio       ratioFetcher
 	RatioLimits limits.Limits
+
+	// DefaultNodeSelector is the default node selector to apply to pods
+	DefaultNodeSelector map[string]string
+	// DefaultNamespaceNodeSelectorAnnotation is the annotation to use for the default node selector
+	DefaultNamespaceNodeSelectorAnnotation string
 }
 
 type ratioFetcher interface {
@@ -68,12 +75,23 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 		l.Error(err, "failed to get node selector")
 		return errored(http.StatusBadRequest, err)
 	}
+	if len(nodeSel) == 0 {
+		sel, err := v.getDefaultNodeSelectorFromNamespace(ctx, req.Namespace)
+		if err != nil {
+			l.Error(err, "failed to get default node selector from namespace")
+		}
+		nodeSel = sel
+	}
+	if len(nodeSel) == 0 {
+		nodeSel = v.DefaultNodeSelector
+	}
 
 	l = l.WithValues("current_ratios", ratios, "node_selector", nodeSel)
 	// If we are creating an object with resource requests, we add them to the current ratio
 	// We cannot easily do this when updating resources.
 	if req.Operation == admissionv1.Create {
-		r := ratios[labels.Set(nodeSel).String()]
+		key := fuzzyMatchRatioKey(labels.Set(nodeSel).String(), ratios)
+		r := ratios[key]
 		if r == nil {
 			r = ratio.NewRatio()
 		}
@@ -82,7 +100,7 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 			l.Error(err, "failed to record object")
 			return errored(http.StatusBadRequest, err)
 		}
-		ratios[labels.Set(nodeSel).String()] = r
+		ratios[key] = r
 
 		l = l.WithValues("ratio", r)
 	}
@@ -161,6 +179,21 @@ func (v *RatioValidator) getNodeSelector(req admission.Request) (map[string]stri
 	return nil, nil
 }
 
+func (v *RatioValidator) getDefaultNodeSelectorFromNamespace(ctx context.Context, namespace string) (map[string]string, error) {
+	ns := corev1.Namespace{}
+	err := v.Client.Get(ctx, client.ObjectKey{Name: namespace}, &ns)
+	if err != nil {
+		return nil, err
+	}
+	return labels.ConvertSelectorToLabelsMap(ns.Annotations[v.DefaultNamespaceNodeSelectorAnnotation])
+}
+
+// InjectDecoder injects a Admission request decoder
+func (v *RatioValidator) InjectDecoder(d *admission.Decoder) error {
+	v.decoder = d
+	return nil
+}
+
 func errored(code int32, err error) admission.Response {
 	return admission.Response{
 		AdmissionResponse: admissionv1.AdmissionResponse{
@@ -173,8 +206,22 @@ func errored(code int32, err error) admission.Response {
 	}
 }
 
-// InjectDecoder injects a Admission request decoder
-func (v *RatioValidator) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
+// fuzzyMatchRatioKey returns the key in ratios that matches the node selector.
+// If there is no exact match, it returns the key that matches a subset of the labels.
+// This is done if the node selector comes from the default node selector which does
+// not contain all labels that might be added by the scheduler.
+func fuzzyMatchRatioKey(s string, ratios map[string]*ratio.Ratio) string {
+	if _, ok := ratios[s]; ok {
+		return s
+	}
+
+	sel, _ := labels.Parse(s)
+	for k := range ratios {
+		ks, _ := labels.ConvertSelectorToLabelsMap(k)
+		if sel.Matches(ks) {
+			return k
+		}
+	}
+
+	return s
 }
