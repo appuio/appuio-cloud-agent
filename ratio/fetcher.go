@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -22,8 +23,8 @@ type Fetcher struct {
 	OrganizationLabel string
 }
 
-// FetchRatio collects the CPU to memory request ratio for the given namespace
-func (f Fetcher) FetchRatio(ctx context.Context, name string) (*Ratio, error) {
+// FetchRatios collects the CPU to memory request ratio for the given namespace grouped by `.spec.nodeSelector`.
+func (f Fetcher) FetchRatios(ctx context.Context, name string) (map[string]*Ratio, error) {
 	ns := corev1.Namespace{}
 	err := f.Client.Get(ctx, client.ObjectKey{
 		Name: name,
@@ -46,11 +47,21 @@ func (f Fetcher) FetchRatio(ctx context.Context, name string) (*Ratio, error) {
 		}
 	}
 
-	r := NewRatio()
 	pods := corev1.PodList{}
 	err = f.Client.List(ctx, &pods, client.InNamespace(name))
 	if err != nil {
-		return r, err
+		return nil, err
 	}
-	return r.RecordPod(pods.Items...), nil
+
+	ratios := make(map[string]*Ratio)
+	for _, pod := range pods.Items {
+		k := labels.Set(pod.Spec.NodeSelector).String()
+		r, ok := ratios[k]
+		if !ok {
+			r = NewRatio()
+		}
+		ratios[k] = r.RecordPod(pod)
+	}
+
+	return ratios, nil
 }

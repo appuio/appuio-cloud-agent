@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/appuio/appuio-cloud-agent/limits"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -164,22 +165,26 @@ func prepareRatioTest(t *testing.T, cfg testRatioCfg) *RatioReconciler {
 		Scheme:   scheme,
 		Ratio: fakeRatioFetcher{
 			err: cfg.fetchErr,
-			ratio: &ratio.Ratio{
+			ratios: map[string]*ratio.Ratio{"": {
 				CPU:    cfg.fetchCPU.AsDec(),
 				Memory: cfg.fetchMemory.AsDec(),
 			},
+			}},
+		RatioLimits: limits.Limits{
+			{
+				Limit: &cfg.limit,
+			},
 		},
-		RatioLimit: &cfg.limit,
 	}
 }
 
 type fakeRatioFetcher struct {
-	err   error
-	ratio *ratio.Ratio
+	err    error
+	ratios map[string]*ratio.Ratio
 }
 
-func (f fakeRatioFetcher) FetchRatio(ctx context.Context, ns string) (*ratio.Ratio, error) {
-	return f.ratio, f.err
+func (f fakeRatioFetcher) FetchRatios(ctx context.Context, ns string) (map[string]*ratio.Ratio, error) {
+	return f.ratios, f.err
 }
 
 var testNs = &corev1.Namespace{

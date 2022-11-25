@@ -4,7 +4,9 @@ import (
 	"errors"
 	"os"
 
+	"github.com/appuio/appuio-cloud-agent/limits"
 	"go.uber.org/multierr"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/yaml"
 )
 
@@ -13,7 +15,12 @@ type Config struct {
 	OrganizationLabel string
 
 	// MemoryPerCoreLimit is the fair use limit of memory usage per CPU core
-	MemoryPerCoreLimit string
+	// it is deprecated and will be removed in a future version.
+	// Use MemoryPerCoreLimits: {Limit: "XGi"} instead.
+	MemoryPerCoreLimit *resource.Quantity
+	// MemoryPerCoreLimits is the fair use limit of memory usage per CPU core
+	// It is possible to select limits by node selector labels
+	MemoryPerCoreLimits limits.Limits
 
 	// Privileged* is a list of the given type allowed to bypass restrictions.
 	// Wildcards are supported (e.g. "system:serviceaccount:default:*" or "cluster-*-operator").
@@ -35,13 +42,18 @@ type Config struct {
 	DefaultOrganizationClusterRoles map[string]string
 }
 
-func ConfigFromFile(path string) (Config, error) {
+func ConfigFromFile(path string) (c Config, warn []string, err error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return Config{}, err
+		return Config{}, nil, err
 	}
-	var c Config
-	return c, yaml.Unmarshal(raw, &c, yaml.DisallowUnknownFields)
+	err = yaml.Unmarshal(raw, &c, yaml.DisallowUnknownFields)
+	if err != nil {
+		return Config{}, nil, err
+	}
+
+	c, warnings := migrateConfig(c)
+	return c, warnings, nil
 }
 
 func (c Config) Validate() error {
@@ -50,9 +62,21 @@ func (c Config) Validate() error {
 	if c.OrganizationLabel == "" {
 		errs = append(errs, errors.New("OrganizationLabel must not be empty"))
 	}
-	if c.MemoryPerCoreLimit == "" {
-		errs = append(errs, errors.New("MemoryPerCoreLimit must not be empty"))
-	}
 
 	return multierr.Combine(errs...)
+}
+
+func migrateConfig(c Config) (Config, []string) {
+	warnings := make([]string, 0)
+
+	if c.MemoryPerCoreLimit != nil && c.MemoryPerCoreLimits == nil {
+		warnings = append(warnings, "MemoryPerCoreLimit is deprecated and will be removed in a future version. Use MemoryPerCoreLimits: {Limit: \"XGi\"} instead.")
+		c.MemoryPerCoreLimits = limits.Limits{
+			{
+				Limit: c.MemoryPerCoreLimit,
+			},
+		}
+	}
+
+	return c, warnings
 }

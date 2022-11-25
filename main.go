@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -57,10 +56,13 @@ func main() {
 	flag.Parse()
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	conf, err := ConfigFromFile(*configFilePath)
+	conf, warnings, err := ConfigFromFile(*configFilePath)
 	if err != nil {
 		setupLog.Error(err, "unable to read config file")
 		os.Exit(1)
+	}
+	for _, warning := range warnings {
+		setupLog.Info("WARNING " + warning)
 	}
 	if err := conf.Validate(); err != nil {
 		setupLog.Error(err, "invalid configuration")
@@ -83,7 +85,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	registerRatioController(mgr, conf.MemoryPerCoreLimit, conf.OrganizationLabel)
+	registerRatioController(mgr, conf, conf.OrganizationLabel)
 	registerOrganizationRBACController(mgr, conf.OrganizationLabel, conf.DefaultOrganizationClusterRoles)
 
 	// Currently unused, but will be used for the next kyverno replacements
@@ -139,15 +141,14 @@ func registerOrganizationRBACController(mgr ctrl.Manager, orgLabel string, defau
 	}
 }
 
-func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) {
-	limit, err := resource.ParseQuantity(memoryCPURatio)
-	if err != nil {
-		setupLog.Error(err, "unable to parse memory-per-core-limit")
-		os.Exit(1)
-	}
+func registerRatioController(mgr ctrl.Manager, conf Config, orgLabel string) {
 	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
 		Handler: &webhooks.RatioValidator{
-			RatioLimit: &limit,
+			DefaultNodeSelector:                    conf.DefaultNodeSelector,
+			DefaultNamespaceNodeSelectorAnnotation: conf.DefaultNamespaceNodeSelectorAnnotation,
+
+			Client:      mgr.GetClient(),
+			RatioLimits: conf.MemoryPerCoreLimits,
 			Ratio: &ratio.Fetcher{
 				Client: mgr.GetClient(),
 			},
@@ -155,10 +156,10 @@ func registerRatioController(mgr ctrl.Manager, memoryCPURatio, orgLabel string) 
 	})
 
 	if err := (&controllers.RatioReconciler{
-		Client:     mgr.GetClient(),
-		Recorder:   mgr.GetEventRecorderFor("resource-ratio-controller"),
-		Scheme:     mgr.GetScheme(),
-		RatioLimit: &limit,
+		Client:      mgr.GetClient(),
+		Recorder:    mgr.GetEventRecorderFor("resource-ratio-controller"),
+		Scheme:      mgr.GetScheme(),
+		RatioLimits: conf.MemoryPerCoreLimits,
 		Ratio: &ratio.Fetcher{
 			Client:            mgr.GetClient(),
 			OrganizationLabel: orgLabel,

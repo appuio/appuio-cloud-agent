@@ -3,12 +3,15 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/appuio/appuio-cloud-agent/limits"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,12 +24,12 @@ type RatioReconciler struct {
 	Recorder record.EventRecorder
 	Scheme   *runtime.Scheme
 
-	Ratio      ratioFetcher
-	RatioLimit *resource.Quantity
+	Ratio       ratioFetcher
+	RatioLimits limits.Limits
 }
 
 type ratioFetcher interface {
-	FetchRatio(ctx context.Context, ns string) (*ratio.Ratio, error)
+	FetchRatios(ctx context.Context, ns string) (map[string]*ratio.Ratio, error)
 }
 
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
@@ -38,7 +41,7 @@ var eventReason = "TooMuchCPURequest"
 func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx).WithValues("namespace", req.Namespace, "name", req.Name)
 
-	nsRatio, err := r.Ratio.FetchRatio(ctx, req.Namespace)
+	nsRatios, err := r.Ratio.FetchRatios(ctx, req.Namespace)
 	if err != nil {
 		if errors.Is(err, ratio.ErrorDisabled) {
 			l.V(1).Info("namespace disabled")
@@ -48,21 +51,33 @@ func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	if nsRatio.Below(*r.RatioLimit) {
-		l.Info("recording warn event: ratio too low")
-
-		if err := r.warnPod(ctx, req.Name, req.Namespace, nsRatio); err != nil {
-			l.Error(err, "failed to record event on pod")
+	for nodeSel, ratio := range nsRatios {
+		sel, err := labels.ConvertSelectorToLabelsMap(nodeSel)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to convert node selector '%s' to labels map: %w", nodeSel, err)
 		}
-		if err := r.warnNamespace(ctx, req.Namespace, nsRatio); err != nil {
-			l.Error(err, "failed to record event on namespace")
+		limit := r.RatioLimits.GetLimitForNodeSelector(sel)
+		if limit == nil {
+			l.Info("no limit found for node selector", "nodeSelector", nodeSel)
+			continue
+		}
+
+		if ratio.Below(*limit) {
+			l.Info("recording warn event: ratio too low")
+
+			if err := r.warnPod(ctx, req.Name, req.Namespace, ratio, nodeSel, limit); err != nil {
+				l.Error(err, "failed to record event on pod")
+			}
+			if err := r.warnNamespace(ctx, req.Namespace, ratio, nodeSel, limit); err != nil {
+				l.Error(err, "failed to record event on namespace")
+			}
 		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *RatioReconciler) warnPod(ctx context.Context, name, namespace string, nsRatio *ratio.Ratio) error {
+func (r *RatioReconciler) warnPod(ctx context.Context, name, namespace string, nsRatio *ratio.Ratio, sel string, limit *resource.Quantity) error {
 	pod := corev1.Pod{}
 	err := r.Get(ctx, client.ObjectKey{
 		Namespace: namespace,
@@ -71,10 +86,10 @@ func (r *RatioReconciler) warnPod(ctx context.Context, name, namespace string, n
 	if err != nil {
 		return err
 	}
-	r.Recorder.Event(&pod, "Warning", eventReason, nsRatio.Warn(r.RatioLimit))
+	r.Recorder.Event(&pod, "Warning", eventReason, nsRatio.Warn(limit, sel))
 	return nil
 }
-func (r *RatioReconciler) warnNamespace(ctx context.Context, name string, nsRatio *ratio.Ratio) error {
+func (r *RatioReconciler) warnNamespace(ctx context.Context, name string, nsRatio *ratio.Ratio, sel string, limit *resource.Quantity) error {
 	ns := corev1.Namespace{}
 	err := r.Get(ctx, client.ObjectKey{
 		Name: name,
@@ -82,7 +97,7 @@ func (r *RatioReconciler) warnNamespace(ctx context.Context, name string, nsRati
 	if err != nil {
 		return err
 	}
-	r.Recorder.Event(&ns, "Warning", eventReason, nsRatio.Warn(r.RatioLimit))
+	r.Recorder.Event(&ns, "Warning", eventReason, nsRatio.Warn(limit, sel))
 	return nil
 }
 
