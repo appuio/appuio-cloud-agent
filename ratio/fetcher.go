@@ -23,7 +23,7 @@ type Fetcher struct {
 	OrganizationLabel string
 }
 
-// FetchRatio collects the CPU to memory request ratio for the given namespace
+// FetchRatios collects the CPU to memory request ratio for the given namespace grouped by `.spec.nodeSelector`.
 func (f Fetcher) FetchRatios(ctx context.Context, name string) (map[string]*Ratio, error) {
 	ns := corev1.Namespace{}
 	err := f.Client.Get(ctx, client.ObjectKey{
