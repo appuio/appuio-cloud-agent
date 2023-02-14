@@ -57,11 +57,13 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	var errs []error
-	for rb, cr := range r.DefaultClusterRoles {
-		if err := r.putRoleBinding(ctx, ns, rb, cr, org); err != nil {
-			l.WithValues("rolebinding", rb).Error(err, "unable to create rolebinding")
-			r.Recorder.Eventf(&ns, "Warning", "RoleBindingCreationFailed", "Failed to create rolebinding %q", rb)
-			errs = append(errs, err)
+	if _, nsNoAccess := ns.Labels["appuio.io/no-access"]; !nsNoAccess {
+		for rb, cr := range r.DefaultClusterRoles {
+			if err := r.putRoleBinding(ctx, ns, rb, cr, org); err != nil {
+				l.WithValues("rolebinding", rb).Error(err, "unable to create rolebinding")
+				r.Recorder.Eventf(&ns, "Warning", "RoleBindingCreationFailed", "Failed to create rolebinding %q", rb)
+				errs = append(errs, err)
+			}
 		}
 	}
 	return ctrl.Result{}, multierr.Combine(errs...)
