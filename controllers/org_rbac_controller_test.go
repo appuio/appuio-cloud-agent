@@ -78,7 +78,7 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 			clusterRoles: defaultCRs,
 			namespace:    "buzz",
 			nsLabels: map[string]string{
-				"appuio.io/no-access": "",
+				"appuio.io/no-access": "true",
 				orgLabel:              "foo",
 			},
 		},

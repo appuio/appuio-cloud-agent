@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,10 @@ type OrganizationRBACReconciler struct {
 // In that case the controller will update it to bind to the organization.
 const LabelRoleBindingUninitialized = "appuio.io/uninitialized"
 
+// LabelNsNoAccess is used to speficy if RBAC rules should be created for a namespace.
+// If not specified it defaults to `admin` privileges on the namespace owned by the organization
+const LabelNsNoAccess = "appuio.io/no-access"
+
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;patch;update
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -57,15 +62,17 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	var errs []error
-	if _, nsNoAccess := ns.Labels["appuio.io/no-access"]; !nsNoAccess {
-		for rb, cr := range r.DefaultClusterRoles {
-			if err := r.putRoleBinding(ctx, ns, rb, cr, org); err != nil {
-				l.WithValues("rolebinding", rb).Error(err, "unable to create rolebinding")
-				r.Recorder.Eventf(&ns, "Warning", "RoleBindingCreationFailed", "Failed to create rolebinding %q", rb)
-				errs = append(errs, err)
-			}
+	if nsNoAccess, nsNoAccessExists := ns.Labels[LabelNsNoAccess]; nsNoAccessExists && (strings.ToLower(nsNoAccess) == "true") {
+		return ctrl.Result{}, nil
+	}
+	for rb, cr := range r.DefaultClusterRoles {
+		if err := r.putRoleBinding(ctx, ns, rb, cr, org); err != nil {
+			l.WithValues("rolebinding", rb).Error(err, "unable to create rolebinding")
+			r.Recorder.Eventf(&ns, "Warning", "RoleBindingCreationFailed", "Failed to create rolebinding %q", rb)
+			errs = append(errs, err)
 		}
 	}
+
 	return ctrl.Result{}, multierr.Combine(errs...)
 }
 
