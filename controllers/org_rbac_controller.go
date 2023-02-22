@@ -60,7 +60,7 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-	if r.getLabel(ns, LabelNsNoRBAC) == "true" {
+	if r.skipRBACManagement(ns) {
 		return ctrl.Result{}, nil
 	}
 
@@ -85,13 +85,14 @@ func (r *OrganizationRBACReconciler) getOrganization(ns corev1.Namespace) string
 	return org
 }
 
-func (r *OrganizationRBACReconciler) getLabel(ns corev1.Namespace, labelKey string) string {
+func (r *OrganizationRBACReconciler) skipRBACManagement(ns corev1.Namespace) bool {
 	label := ""
 	nsLabels := ns.Labels
 	if nsLabels != nil {
-		label = nsLabels[labelKey]
+		label = nsLabels[LabelNsNoRBAC]
 	}
-	return label
+	result, err := strconv.ParseBool(label)
+	return err == nil && result
 }
 
 func (r *OrganizationRBACReconciler) putRoleBinding(ctx context.Context, ns corev1.Namespace, name string, clusterRole string, group string) error {
