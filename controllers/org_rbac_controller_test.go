@@ -82,6 +82,22 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 				orgLabel:                     "foo",
 			},
 		},
+		"NoRbacCreationFalseOrgNs_CreateRole": {
+			clusterRoles: defaultCRs,
+			namespace:    "buzz",
+			nsLabels: map[string]string{
+				"appuio.io/no-rbac-creation": "false",
+				orgLabel:                     "foo",
+			},
+
+			expected: []rb{
+				{
+					name:    "admin",
+					roleRef: "admin",
+					groups:  []string{"foo"},
+				},
+			},
+		},
 
 		"OrgNs_CreateRole": {
 			clusterRoles: defaultCRs,
