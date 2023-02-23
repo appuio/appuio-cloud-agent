@@ -33,6 +33,10 @@ type OrganizationRBACReconciler struct {
 // In that case the controller will update it to bind to the organization.
 const LabelRoleBindingUninitialized = "appuio.io/uninitialized"
 
+// LabelNamespaceNoRBAC is used to speficy if RBAC rules should be created for a namespace.
+// If not specified it defaults to `admin` privileges on the namespace owned by the organization
+const LabelNamespaceNoRBAC = "appuio.io/no-rbac-creation"
+
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 //+kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;patch;update
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -56,6 +60,10 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
+	if r.skipRBACManagement(ns) {
+		return ctrl.Result{}, nil
+	}
+
 	var errs []error
 	for rb, cr := range r.DefaultClusterRoles {
 		if err := r.putRoleBinding(ctx, ns, rb, cr, org); err != nil {
@@ -64,6 +72,7 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			errs = append(errs, err)
 		}
 	}
+
 	return ctrl.Result{}, multierr.Combine(errs...)
 }
 
@@ -74,6 +83,16 @@ func (r *OrganizationRBACReconciler) getOrganization(ns corev1.Namespace) string
 		org = nsLabels[r.OrganizationLabel]
 	}
 	return org
+}
+
+func (r *OrganizationRBACReconciler) skipRBACManagement(ns corev1.Namespace) bool {
+	label := ""
+	nsLabels := ns.Labels
+	if nsLabels != nil {
+		label = nsLabels[LabelNamespaceNoRBAC]
+	}
+	result, err := strconv.ParseBool(label)
+	return err == nil && result
 }
 
 func (r *OrganizationRBACReconciler) putRoleBinding(ctx context.Context, ns corev1.Namespace, name string, clusterRole string, group string) error {
