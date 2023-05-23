@@ -6,7 +6,7 @@ require (
 	github.com/minio/pkg v1.7.2
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/multierr v1.9.0
-	gomodules.xyz/jsonpatch/v2 v2.2.0
+	gomodules.xyz/jsonpatch/v2 v2.3.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.25.4
 	k8s.io/apimachinery v0.25.4
