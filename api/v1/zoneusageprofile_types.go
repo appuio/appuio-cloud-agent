@@ -10,10 +10,8 @@ import (
 
 // ZoneUsageProfileSpec defines the desired state of ZoneUsageProfile
 type ZoneUsageProfileSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	controlv1.UsageProfileSpec `json:",inline"`
+	// UpstreamSpec is the spec of the upstream UsageProfile
+	UpstreamSpec controlv1.UsageProfileSpec `json:"upstreamSpec"`
 }
 
 // ZoneUsageProfileStatus defines the observed state of ZoneUsageProfile

@@ -1,0 +1,10 @@
+resources:
+- role_binding.yaml
+- role.yaml
+- service_account.yaml
+
+namePrefix: swi-test-zone-
+namespace: default
+
+configurations:
+  - kustomizeconfig.yaml

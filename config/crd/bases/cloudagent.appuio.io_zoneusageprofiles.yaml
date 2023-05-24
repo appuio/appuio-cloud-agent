@@ -35,18 +35,25 @@ spec:
           spec:
             description: ZoneUsageProfileSpec defines the desired state of ZoneUsageProfile
             properties:
-              namespaceCount:
-                description: NamespaceCount is the number of namespaces an organization
-                  with this usage profile can create per zone.
-                type: integer
-              resources:
-                additionalProperties:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
-                description: Resources is the set of resources which are created in
-                  each namespace for which the usage profile is applied. The key is
-                  used as the name of the resource and the value is the resource definition.
+              upstreamSpec:
+                description: UpstreamSpec is the spec of the upstream UsageProfile
+                properties:
+                  namespaceCount:
+                    description: NamespaceCount is the number of namespaces an organization
+                      with this usage profile can create per zone.
+                    type: integer
+                  resources:
+                    additionalProperties:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    description: Resources is the set of resources which are created
+                      in each namespace for which the usage profile is applied. The
+                      key is used as the name of the resource and the value is the
+                      resource definition.
+                    type: object
                 type: object
+            required:
+            - upstreamSpec
             type: object
           status:
             description: ZoneUsageProfileStatus defines the observed state of ZoneUsageProfile

@@ -19,3 +19,6 @@ webhook-certs/
 
 # fuzz testcases
 */testdata/fuzz/
+
+# runing locally
+kubeconfig-control-api

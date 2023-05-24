@@ -384,8 +384,7 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	decoder, err := admission.NewDecoder(scheme)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(scheme)
 	barNs := newNamespace("bar", nil, nil)
 	barNs.Annotations = map[string]string{
 		ratio.RatioValidatiorDisableAnnotation: "False",

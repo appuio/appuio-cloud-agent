@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 	"time"
 
+	controlv1 "github.com/appuio/control-api/apis/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
+	"go.uber.org/multierr"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -17,6 +20,7 @@ import (
 
 	agentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
 	"github.com/appuio/appuio-cloud-agent/controllers"
+	"github.com/appuio/appuio-cloud-agent/controllers/clustersource"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/appuio/appuio-cloud-agent/skipper"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
@@ -43,6 +47,7 @@ func init() {
 	utilruntime.Must(userv1.AddToScheme(scheme))
 	utilruntime.Must(projectv1.AddToScheme(scheme))
 	utilruntime.Must(agentv1.AddToScheme(scheme))
+	utilruntime.Must(controlv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -56,6 +61,9 @@ func main() {
 	webhookPort := flag.Int("webhook-port", 9443, "The port on which the admission webhooks are served")
 
 	configFilePath := flag.String("config-file", "./config.yaml", "Path to the configuration file")
+
+	var controlAPIKubeconfig string
+	flag.StringVar(&controlAPIKubeconfig, "kubeconfig-control-api", "kubeconfig-control-api", "Path to the kubeconfig file to query the control API")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
@@ -75,7 +83,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := ctrl.SetupSignalHandler()
+	if controlAPIKubeconfig == "" {
+		setupLog.Info("no control API kubeconfig provided, aborting")
+		os.Exit(1)
+	}
+
+	cac, err := os.ReadFile(controlAPIKubeconfig)
+	if err != nil {
+		setupLog.Error(err, "unable to read control API kubeconfig")
+		os.Exit(1)
+	}
+	controlAPICluster, err := clustersource.FromKubeConfig(cac, scheme)
+	if err != nil {
+		setupLog.Error(err, "unable to setup control-api manager")
+		os.Exit(1)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -94,6 +116,15 @@ func main() {
 	registerRatioController(mgr, conf, conf.OrganizationLabel)
 	registerOrganizationRBACController(mgr, conf.OrganizationLabel, conf.DefaultOrganizationClusterRoles)
 
+	if err := (&controllers.ZoneUsageProfileReconciler{
+		Client:        mgr.GetClient(),
+		ForeignClient: controlAPICluster.GetClient(),
+		Scheme:        mgr.GetScheme(),
+	}).SetupWithManagerAndForeignCluster(mgr, controlAPICluster); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ratio")
+		os.Exit(1)
+	}
+
 	// Currently unused, but will be used for the next kyverno replacements
 	psk := &skipper.PrivilegedUserSkipper{
 		Client: mgr.GetClient(),
@@ -105,7 +136,7 @@ func main() {
 
 	registerNodeSelectorValidationWebhooks(mgr, conf)
 
-	mgr.GetWebhookServer().Register("/mutate-pod-node-selector", &webhook.Admission{
+	mgr.GetWebhookServer().Register("/validate-namespace-quota", &webhook.Admission{
 		Handler: &webhooks.NamespaceQuotaValidator{
 			Skipper: psk,
 			Client:  mgr.GetClient(),
@@ -126,9 +157,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
-	if err := mgr.Start(ctx); err != nil {
-		setupLog.Error(err, "problem running manager")
+	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	shutdown := make(chan error)
+	go func() {
+		defer cancel()
+		setupLog.Info("starting control-api manager")
+		shutdown <- controlAPICluster.Start(ctx)
+	}()
+	go func() {
+		defer cancel()
+		setupLog.Info("starting manager")
+		shutdown <- mgr.Start(ctx)
+	}()
+	if err := multierr.Combine(<-shutdown, <-shutdown); err != nil {
+		setupLog.Error(err, "failed to start")
 		os.Exit(1)
 	}
 }

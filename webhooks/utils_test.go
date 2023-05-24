@@ -72,8 +72,7 @@ func prepareClient(t *testing.T, initObjs ...client.Object) (client.WithWatch, *
 	require.NoError(t, userv1.AddToScheme(scheme))
 	require.NoError(t, projectv1.AddToScheme(scheme))
 
-	decoder, err := admission.NewDecoder(scheme)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(scheme)
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
