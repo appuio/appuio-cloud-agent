@@ -153,7 +153,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 			user:      "bar",
 			namespace: "fail-bar",
 			resources: []client.Object{
-				testNamespace("fail-bar"),
+				newNamespace("fail-bar", nil, nil),
 				podFromResources("pod1", "foo", podResource{
 					{cpu: "100m", memory: "3G"},
 				}),
@@ -386,26 +386,26 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 
 	decoder, err := admission.NewDecoder(scheme)
 	require.NoError(t, err)
-	barNs := testNamespace("bar")
+	barNs := newNamespace("bar", nil, nil)
 	barNs.Annotations = map[string]string{
 		ratio.RatioValidatiorDisableAnnotation: "False",
 	}
 
-	disabledNs := testNamespace("disabled-foo")
+	disabledNs := newNamespace("disabled-foo", nil, nil)
 	disabledNs.Annotations = map[string]string{
 		ratio.RatioValidatiorDisableAnnotation: "True",
 	}
-	otherDisabledNs := testNamespace("disabled-bar")
+	otherDisabledNs := newNamespace("disabled-bar", nil, nil)
 	otherDisabledNs.Annotations = map[string]string{
 		ratio.RatioValidatiorDisableAnnotation: "true",
 	}
 
-	nsWithDefaultNodeSelector := testNamespace("ns-with-default-node-selector")
+	nsWithDefaultNodeSelector := newNamespace("ns-with-default-node-selector", nil, nil)
 	nsWithDefaultNodeSelector.Annotations = map[string]string{
 		defaultNodeSelectorAnnotation: "class=plus",
 	}
 
-	initObjs = append(initObjs, testNamespace("foo"), barNs, disabledNs, otherDisabledNs, nsWithDefaultNodeSelector)
+	initObjs = append(initObjs, newNamespace("foo", nil, nil), barNs, disabledNs, otherDisabledNs, nsWithDefaultNodeSelector)
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithObjects(initObjs...).
@@ -422,14 +422,6 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 	}
 	uv.InjectDecoder(decoder)
 	return uv
-}
-
-func testNamespace(name string) *corev1.Namespace {
-	return &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
 }
 
 func podFromResources(name, namespace string, res podResource, modify ...func(*corev1.Pod)) *corev1.Pod {

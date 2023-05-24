@@ -14,6 +14,9 @@ type Config struct {
 	// OrganizationLabel is the label used to mark namespaces to belong to an organization
 	OrganizationLabel string
 
+	// UserDefaultOrganizationAnnotation is the annotation the default organization setting for a user is stored in.
+	UserDefaultOrganizationAnnotation string
+
 	// MemoryPerCoreLimit is the fair use limit of memory usage per CPU core
 	// it is deprecated and will be removed in a future version.
 	// Use MemoryPerCoreLimits: {Limit: "XGi"} instead.
@@ -40,6 +43,9 @@ type Config struct {
 	// DefaultOrganizationClusterRoles is a map containing the configuration for rolebindings that are created by default in each organization namespace.
 	// The keys are the name of default rolebindings to create and the values are the names of the clusterroles they bind to.
 	DefaultOrganizationClusterRoles map[string]string
+
+	// DefaultNamespaceCountLimit is the maximum number of namespaces a user can create for an organization.
+	DefaultNamespaceCountLimit int
 }
 
 func ConfigFromFile(path string) (c Config, warn []string, err error) {

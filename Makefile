@@ -54,7 +54,7 @@ vet: ## Run 'go vet' against code
 	go vet ./...
 
 .PHONY: lint
-lint: fmt vet generate ## All-in-one linting
+lint: fmt vet generate manifests ## All-in-one linting
 	@echo 'Check for uncommitted changes ...'
 	git diff --exit-code
 
@@ -63,6 +63,13 @@ generate: ## Generate additional code and artifacts
 	@go generate ./...
 	@# Kubebuilder misses the scope field for the webhook generator
 	@yq eval -i '.webhooks[] |= with(select(.name == "validate-request-ratio.appuio.io"); .rules[] |= .scope = "Namespaced")' config/webhook/manifests.yaml
+	@## Kubebuilder misses the namespaceSelector field for the webhook generator
+	@# @yq eval -i '.webhooks[] |= with(select(.name == "validate-namespace-quota.appuio.io");                 .namespaceSelector = {"matchExpressions": [{"key": "appuio.io/organization", "operator": "Exists" }]})' config/webhook/manifests.yaml
+	@# @yq eval -i '.webhooks[] |= with(select(.name == "validate-namespace-quota-projectrequests.appuio.io"); .namespaceSelector = {"matchExpressions": [{"key": "appuio.io/organization", "operator": "Exists" }]})' config/webhook/manifests.yaml
+
+.PHONY: manifests
+manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: clean
 clean: ## Cleans local build artifacts

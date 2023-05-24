@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	projectv1 "github.com/openshift/api/project/v1"
+	userv1 "github.com/openshift/api/user/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -13,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	agentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
 	"github.com/appuio/appuio-cloud-agent/controllers"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/appuio/appuio-cloud-agent/skipper"
@@ -37,6 +40,9 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(userv1.AddToScheme(scheme))
+	utilruntime.Must(projectv1.AddToScheme(scheme))
+	utilruntime.Must(agentv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -96,9 +102,20 @@ func main() {
 		PrivilegedGroups:       conf.PrivilegedGroups,
 		PrivilegedClusterRoles: conf.PrivilegedClusterRoles,
 	}
-	_ = psk
 
 	registerNodeSelectorValidationWebhooks(mgr, conf)
+
+	mgr.GetWebhookServer().Register("/mutate-pod-node-selector", &webhook.Admission{
+		Handler: &webhooks.NamespaceQuotaValidator{
+			Skipper: psk,
+			Client:  mgr.GetClient(),
+
+			OrganizationLabel:                 conf.OrganizationLabel,
+			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,
+
+			DefaultNamespaceCountLimit: conf.DefaultNamespaceCountLimit,
+		},
+	})
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to setup health endpoint")

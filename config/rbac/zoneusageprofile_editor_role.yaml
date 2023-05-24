@@ -1,0 +1,31 @@
+# permissions for end users to edit zoneusageprofiles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: ZoneUsageProfile-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: appuio-cloud-agent
+    app.kubernetes.io/part-of: appuio-cloud-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: ZoneUsageProfile-editor-role
+rules:
+- apiGroups:
+  - cloudagent.appuio.io
+  resources:
+  - zoneusageprofiles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cloudagent.appuio.io
+  resources:
+  - zoneusageprofiles/status
+  verbs:
+  - get

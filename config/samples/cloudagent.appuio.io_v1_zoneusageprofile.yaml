@@ -1,0 +1,12 @@
+apiVersion: cloudagent.appuio.io/v1
+kind: ZoneUsageProfile
+metadata:
+  labels:
+    app.kubernetes.io/name: ZoneUsageProfile
+    app.kubernetes.io/instance: ZoneUsageProfile-sample
+    app.kubernetes.io/part-of: appuio-cloud-agent
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: appuio-cloud-agent
+  name: ZoneUsageProfile-sample
+spec:
+  # TODO(user): Add fields here
