@@ -21,7 +21,7 @@ func Test_PodNodeSelectorMutator_Handle(t *testing.T) {
 		newNamespace("ns-no-annotations", nil, nil),
 	}
 
-	c, _, decoder := prepareClient(t, crs...)
+	c, scheme, decoder := prepareClient(t, crs...)
 
 	testCases := []struct {
 		name string
@@ -94,7 +94,7 @@ func Test_PodNodeSelectorMutator_Handle(t *testing.T) {
 			subject.InjectDecoder(decoder)
 
 			pod := newPod(tc.namespace, "test", tc.nodeSelector)
-			resp := subject.Handle(context.Background(), admissionRequestForObject(t, pod))
+			resp := subject.Handle(context.Background(), admissionRequestForObject(t, pod, scheme))
 			t.Log("Response:", resp.Result.Reason, resp.Result.Message)
 			require.ElementsMatch(t, tc.patch, resp.Patches)
 			require.Equal(t, tc.allowed, resp.Allowed)

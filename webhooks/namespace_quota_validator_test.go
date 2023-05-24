@@ -21,10 +21,10 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 	const nsLimit = 2
 
 	tests := map[string]struct {
-		initObjects []client.Object
-		object      client.Object
-		allowed     bool
-		matchReason string
+		initObjects  []client.Object
+		object       client.Object
+		allowed      bool
+		matchMessage string
 	}{
 		"Allow Namespace": {
 			initObjects: []client.Object{
@@ -67,8 +67,8 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 					},
 				},
 			},
-			allowed:     false,
-			matchReason: "You cannot create more than 2 namespaces for organization \"testorg\"",
+			allowed:      false,
+			matchMessage: "You cannot create more than 2 namespaces for organization \"testorg\"",
 		},
 		"Deny ProjectRequest TooMany": {
 			initObjects: []client.Object{newNamespace("a", map[string]string{orgLabel: "testorg"}, nil), newNamespace("b", map[string]string{orgLabel: "testorg"}, nil)},
@@ -80,8 +80,8 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 					},
 				},
 			},
-			allowed:     false,
-			matchReason: "You cannot create more than 2 namespaces for organization \"testorg\"",
+			allowed:      false,
+			matchMessage: "You cannot create more than 2 namespaces for organization \"testorg\"",
 		},
 
 		"Deny Namespace TooMany GetOrganizationFromUser": {
@@ -118,8 +118,8 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 					Name: "test",
 				},
 			},
-			allowed:     false,
-			matchReason: "There is no organization label and the user has no default organization set",
+			allowed:      false,
+			matchMessage: "There is no organization label and the user has no default organization set",
 		},
 
 		"Deny NoOrganizationLabelAndNoUser": {
@@ -134,7 +134,7 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			c, _, dec := prepareClient(t, test.initObjects...)
+			c, scheme, dec := prepareClient(t, test.initObjects...)
 			subject := &NamespaceQuotaValidator{
 				Client:  c,
 				Skipper: skipper.StaticSkipper{ShouldSkip: false},
@@ -145,10 +145,12 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 			}
 			subject.InjectDecoder(dec)
 
-			res := subject.Handle(ctx, admissionRequestForObject(t, test.object))
+			scheme.ObjectKinds(test.object)
+
+			res := subject.Handle(ctx, admissionRequestForObject(t, test.object, scheme))
 			require.Equal(t, test.allowed, res.Allowed)
-			if test.matchReason != "" {
-				require.Contains(t, res.Result.Reason, test.matchReason)
+			if test.matchMessage != "" {
+				require.Contains(t, res.Result.Message, test.matchMessage)
 			}
 		})
 	}
