@@ -116,10 +116,12 @@ func main() {
 	registerRatioController(mgr, conf, conf.OrganizationLabel)
 	registerOrganizationRBACController(mgr, conf.OrganizationLabel, conf.DefaultOrganizationClusterRoles)
 
-	if err := (&controllers.ZoneUsageProfileReconciler{
-		Client:        mgr.GetClient(),
+	if err := (&controllers.ZoneUsageProfileSyncReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("usage-profile-sync-controller"),
+
 		ForeignClient: controlAPICluster.GetClient(),
-		Scheme:        mgr.GetScheme(),
 	}).SetupWithManagerAndForeignCluster(mgr, controlAPICluster); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ratio")
 		os.Exit(1)

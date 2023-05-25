@@ -16,7 +16,6 @@ type ZoneUsageProfileSpec struct {
 
 // ZoneUsageProfileStatus defines the observed state of ZoneUsageProfile
 type ZoneUsageProfileStatus struct {
-	LastSynced metav1.Time `json:"lastSynced,omitempty"`
 }
 
 //+kubebuilder:object:root=true
