@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
+	"github.com/appuio/appuio-cloud-agent/controllers/transformers"
 )
 
 // Test_UsageProfileApplyReconciler_Reconcile tests the Reconcile function of the UsageProfileApplyReconciler.
@@ -39,6 +40,10 @@ func Test_ZoneUsageProfileApplyReconciler_Reconcile(t *testing.T) {
 		Recorder: recorder,
 
 		OrganizationLabel: orgLbl,
+
+		Transformers: []transformers.Transformer{
+			addTestAnnotationTransformer{},
+		},
 	}
 	_, err := subject.Reconcile(context.Background(), reconcile.Request{NamespacedName: types.NamespacedName{Name: profile.Name}})
 	require.NoError(t, err)
@@ -46,7 +51,8 @@ func Test_ZoneUsageProfileApplyReconciler_Reconcile(t *testing.T) {
 	// Check that the ResourceQuota was created in the correct namespace
 	quota := &corev1.ResourceQuota{}
 	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: org1NS.Name}, quota))
-	require.Equal(t, "666", quota.Spec.Hard.Cpu().String())
+	require.Equal(t, "666", quota.Spec.Hard.Cpu().String(), "should have applied manifest content")
+	require.Equal(t, org1NS.Name, quota.Annotations["test"], "should have applied the configured transformer")
 	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: org2NS.Name}, quota))
 	require.Error(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: sysNS.Name}, quota))
 
@@ -165,4 +171,12 @@ func buildUsageProfile(t *testing.T, scheme *runtime.Scheme, name string) *cloud
 			},
 		},
 	}
+}
+
+// take the name from the namespace and adds it as an annotation
+type addTestAnnotationTransformer struct{}
+
+func (a addTestAnnotationTransformer) Transform(ctx context.Context, obj *unstructured.Unstructured, ns *corev1.Namespace) error {
+	obj.SetAnnotations(map[string]string{"test": ns.Name})
+	return nil
 }

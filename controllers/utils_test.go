@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"errors"
 	"testing"
 
 	controlv1 "github.com/appuio/control-api/apis/v1"
@@ -9,13 +8,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
+	"github.com/appuio/appuio-cloud-agent/testutils"
 )
 
 func newNamespace(name string, labels, annotations map[string]string) *corev1.Namespace {
@@ -53,30 +52,5 @@ func prepareClient(t *testing.T, initObjs ...client.Object) (client.WithWatch, *
 func ensureGVK(t *testing.T, scheme *runtime.Scheme, obj client.Object) client.Object {
 	t.Helper()
 
-	if !obj.GetObjectKind().GroupVersionKind().Empty() {
-		return obj
-	}
-
-	gvk, err := findGVKForObject(scheme, obj)
-	require.NoError(t, err)
-	obj.GetObjectKind().SetGroupVersionKind(gvk)
-
-	return obj
-}
-
-func findGVKForObject(scheme *runtime.Scheme, obj client.Object) (schema.GroupVersionKind, error) {
-	gvks, _, err := scheme.ObjectKinds(obj)
-	if err != nil {
-		return schema.GroupVersionKind{}, err
-	}
-	for _, gvk := range gvks {
-		if gvk.Kind == "" {
-			continue
-		}
-		if gvk.Version == "" || gvk.Version == runtime.APIVersionInternal {
-			continue
-		}
-		return gvk, nil
-	}
-	return schema.GroupVersionKind{}, errors.New("no valid GVK found")
+	return testutils.EnsureGroupVersionKind(t, scheme, obj)
 }

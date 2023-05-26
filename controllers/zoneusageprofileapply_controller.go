@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
+	"github.com/appuio/appuio-cloud-agent/controllers/transformers"
 )
 
 // ZoneUsageProfileApplyReconciler reconciles a ZoneUsageProfile object
@@ -29,6 +30,7 @@ type ZoneUsageProfileApplyReconciler struct {
 	Recorder record.EventRecorder
 
 	OrganizationLabel string
+	Transformers      []transformers.Transformer
 }
 
 const resourceOwnerLabel = "cloud-agent.appuio.io/usage-profile"
@@ -63,7 +65,7 @@ func (r *ZoneUsageProfileApplyReconciler) Reconcile(ctx context.Context, req ctr
 			l = l.WithValues("resourceName", name)
 			l.Info("Applying UsageProfile Resource to Namespace")
 
-			if err := r.applyResourceToNamespace(ctx, name, orgNs.Name, resource, profile); err != nil {
+			if err := r.applyResourceToNamespace(ctx, name, orgNs, resource, profile); err != nil {
 				l.Error(err, "unable to create or update resource")
 				r.Recorder.Event(&profile, "Warning", "ApplyFailed", fmt.Sprintf("unable to create or update resource %q in %q: %s", name, orgNs.Name, err))
 				errors = append(errors, err)
@@ -77,7 +79,7 @@ func (r *ZoneUsageProfileApplyReconciler) Reconcile(ctx context.Context, req ctr
 // applyResourceToNamespace applies a resource from a ZoneUsageProfile to a namespace.
 // It handles the needed conversions and sets the resourceOwnerLabel.
 // It returns an error if the resource is already managed by a different ZoneUsageProfile.
-func (r *ZoneUsageProfileApplyReconciler) applyResourceToNamespace(ctx context.Context, name, namespace string, resource runtime.RawExtension, profile cloudagentv1.ZoneUsageProfile) error {
+func (r *ZoneUsageProfileApplyReconciler) applyResourceToNamespace(ctx context.Context, name string, orgNs corev1.Namespace, resource runtime.RawExtension, profile cloudagentv1.ZoneUsageProfile) error {
 	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&resource)
 	if err != nil {
 		return fmt.Errorf("unable to convert RawExtension to Unstructured: %w", err)
@@ -85,7 +87,7 @@ func (r *ZoneUsageProfileApplyReconciler) applyResourceToNamespace(ctx context.C
 	u := &unstructured.Unstructured{}
 	// Set enough information for the GET request to work
 	u.SetGroupVersionKind((&unstructured.Unstructured{Object: raw}).GetObjectKind().GroupVersionKind())
-	u.SetNamespace(namespace)
+	u.SetNamespace(orgNs.Name)
 	u.SetName(name)
 	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, u, func() error {
 		lbls := u.GetLabels()
@@ -95,12 +97,18 @@ func (r *ZoneUsageProfileApplyReconciler) applyResourceToNamespace(ctx context.C
 
 		// Set the full object to be applied, this will overwrite the existing object so we need to re-set the metadata.
 		u.SetUnstructuredContent(raw)
-		u.SetNamespace(namespace)
+		u.SetNamespace(orgNs.Name)
 		u.SetName(name)
+
+		for _, t := range r.Transformers {
+			if err := t.Transform(ctx, u, &orgNs); err != nil {
+				log.FromContext(ctx).Error(err, "unable to fully transform object")
+			}
+		}
 
 		p, exists := lbls[resourceOwnerLabel]
 		if exists && p != profile.Name {
-			return fmt.Errorf("conflict: resource %q/%q in %q already has a different UsageProfile applied: %s", u.GetObjectKind().GroupVersionKind().String(), name, namespace, p)
+			return fmt.Errorf("conflict: resource %q/%q in %q already has a different UsageProfile applied: %s", u.GetObjectKind().GroupVersionKind().String(), name, orgNs.Name, p)
 		}
 		lbls[resourceOwnerLabel] = profile.Name
 		u.SetLabels(lbls)

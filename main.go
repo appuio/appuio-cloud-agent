@@ -21,6 +21,7 @@ import (
 	agentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
 	"github.com/appuio/appuio-cloud-agent/controllers"
 	"github.com/appuio/appuio-cloud-agent/controllers/clustersource"
+	"github.com/appuio/appuio-cloud-agent/controllers/transformers"
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/appuio/appuio-cloud-agent/skipper"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
@@ -132,6 +133,9 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("usage-profile-apply-controller"),
 
 		OrganizationLabel: conf.OrganizationLabel,
+		Transformers: []transformers.Transformer{
+			transformers.NewResourceQuotaTransformer("resourcequota.appuio.io"),
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ratio")
 		os.Exit(1)

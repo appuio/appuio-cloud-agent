@@ -2,9 +2,9 @@ package webhooks
 
 import (
 	"encoding/json"
-	"errors"
 	"testing"
 
+	"github.com/appuio/appuio-cloud-agent/testutils"
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	"github.com/stretchr/testify/require"
@@ -13,7 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -23,11 +22,7 @@ import (
 func admissionRequestForObject(t *testing.T, object client.Object, scheme *runtime.Scheme) admission.Request {
 	t.Helper()
 
-	if object.GetObjectKind().GroupVersionKind().Empty() {
-		g, err := findGVKForObject(scheme, object)
-		require.NoError(t, err)
-		object.GetObjectKind().SetGroupVersionKind(g)
-	}
+	testutils.EnsureGroupVersionKind(t, scheme, object)
 	gvk := object.GetObjectKind().GroupVersionKind()
 
 	raw, err := json.Marshal(object)
@@ -55,23 +50,6 @@ func admissionRequestForObject(t *testing.T, object client.Object, scheme *runti
 			},
 		},
 	}
-}
-
-func findGVKForObject(scheme *runtime.Scheme, obj client.Object) (schema.GroupVersionKind, error) {
-	gvks, _, err := scheme.ObjectKinds(obj)
-	if err != nil {
-		return schema.GroupVersionKind{}, err
-	}
-	for _, gvk := range gvks {
-		if gvk.Kind == "" {
-			continue
-		}
-		if gvk.Version == "" || gvk.Version == runtime.APIVersionInternal {
-			continue
-		}
-		return gvk, nil
-	}
-	return schema.GroupVersionKind{}, errors.New("no valid GVK found")
 }
 
 func newNamespace(name string, labels, annotations map[string]string) *corev1.Namespace {
