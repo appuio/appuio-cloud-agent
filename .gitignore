@@ -2,6 +2,9 @@
 dist/
 .github/release-notes.md
 
+# Tools
+bin/
+
 # Build
 appuio-cloud-agent
 *.out

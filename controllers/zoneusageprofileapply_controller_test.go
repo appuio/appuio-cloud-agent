@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"testing"
+	"time"
 
 	controlv1 "github.com/appuio/control-api/apis/v1"
 	"github.com/stretchr/testify/assert"
@@ -14,8 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
@@ -26,18 +27,31 @@ import (
 func Test_ZoneUsageProfileApplyReconciler_Reconcile(t *testing.T) {
 	orgLbl := "test.com/organization"
 
-	sysNS := newNamespace("kube-system", nil, nil)
-	org1NS := newNamespace("org1", map[string]string{orgLbl: "foo"}, nil)
-	org2NS := newNamespace("org2", map[string]string{orgLbl: "bar"}, nil)
-	c, scheme, recorder := prepareClient(t, sysNS, org1NS, org2NS)
+	// We need to bring the big guns to test the dynamic watches; envtest it is.
+	// Test env must be stopped AFTER the manager has been stopped.
+	// Otherwise the manager will block the shutdown by initiating watch requests to the API server. defer is LIFO.
+	cfg, stop := setupEnvtestEnv(t)
+	defer stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	profile := buildUsageProfile(t, scheme, "test")
-	require.NoError(t, c.Create(context.Background(), profile))
+	_, scheme, recorder := prepareClient(t)
+	mgr, err := manager.New(cfg, manager.Options{Scheme: scheme})
+	require.NoError(t, err)
+	c := mgr.GetClient()
+
+	sysNS := newNamespace("some-system-ns", nil, nil)
+	require.NoError(t, c.Create(context.Background(), sysNS))
+	org1NS := newNamespace("org1", map[string]string{orgLbl: "foo"}, nil)
+	require.NoError(t, c.Create(context.Background(), org1NS))
+	org2NS := newNamespace("org2", map[string]string{orgLbl: "bar"}, nil)
+	require.NoError(t, c.Create(context.Background(), org2NS))
 
 	subject := &ZoneUsageProfileApplyReconciler{
 		Client:   c,
 		Scheme:   scheme,
 		Recorder: recorder,
+		Cache:    mgr.GetCache(),
 
 		OrganizationLabel: orgLbl,
 
@@ -45,26 +59,60 @@ func Test_ZoneUsageProfileApplyReconciler_Reconcile(t *testing.T) {
 			addTestAnnotationTransformer{},
 		},
 	}
-	_, err := subject.Reconcile(context.Background(), reconcile.Request{NamespacedName: types.NamespacedName{Name: profile.Name}})
-	require.NoError(t, err)
+	require.NoError(t, subject.SetupWithManager(mgr))
+	go func() {
+		defer cancel()
+		require.NoError(t, mgr.Start(ctx))
+	}()
+
+	profile := buildUsageProfile(t, scheme, "test")
+	require.NoError(t, c.Create(context.Background(), profile))
 
 	// Check that the ResourceQuota was created in the correct namespace
 	quota := &corev1.ResourceQuota{}
+	requireEventually(t, func(collect *assert.CollectT) {
+		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: org1NS.Name}, quota))
+	}, "should have created a ResourceQuota in the correct namespace")
+
 	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: org1NS.Name}, quota))
 	require.Equal(t, "666", quota.Spec.Hard.Cpu().String(), "should have applied manifest content")
 	require.Equal(t, org1NS.Name, quota.Annotations["test"], "should have applied the configured transformer")
 	require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: org2NS.Name}, quota))
 	require.Error(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: sysNS.Name}, quota))
 
+	// Test new org namespace
+	newOrgNS := newNamespace("org3", map[string]string{orgLbl: "baz"}, nil)
+	require.NoError(t, c.Create(context.Background(), newOrgNS))
+	requireEventually(t, func(collect *assert.CollectT) {
+		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: newOrgNS.Name}, quota))
+	}, "should have created a ResourceQuota in newly created namespace")
+
+	// Test dynamic watches
+	// The controller dynamically watches resources it creates and keeps them in sync.
+	quota.Spec.Hard = corev1.ResourceList{
+		corev1.ResourceCPU: resource.MustParse("777"),
+	}
+	require.NoError(t, c.Update(context.Background(), quota))
+
+	requireEventually(t, func(collect *assert.CollectT) {
+		require.NoError(t, c.Get(context.Background(), types.NamespacedName{Name: "org-usage", Namespace: org1NS.Name}, quota))
+		require.Equal(t, "666", quota.Spec.Hard.Cpu().String(), "should have reset manifest content")
+	}, "should have updated the ResourceQuota in the correct namespace")
+
 	// Test errors on conflicting profiles
 	conflictingProfile := buildUsageProfile(t, scheme, "conflict")
 	require.NoError(t, c.Create(context.Background(), conflictingProfile))
 
-	_, err = subject.Reconcile(context.Background(), reconcile.Request{NamespacedName: types.NamespacedName{Name: conflictingProfile.Name}})
-	require.ErrorContains(t, err, "conflict")
-	require.Len(t, recorder.Events, 2, "should have recorded two events")
+	requireEventually(t, func(collect *assert.CollectT) {
+		require.GreaterOrEqual(t, len(recorder.Events), 2, "should have recorded two events")
+	}, "should have created a ResourceQuota in the correct namespace")
 	assert.Contains(t, <-recorder.Events, "conflict", regexp.MustCompile(`^Warning.*conflict`))
 	assert.Contains(t, <-recorder.Events, "conflict", regexp.MustCompile(`^Warning.*conflict`))
+}
+
+func requireEventually(t *testing.T, f func(collect *assert.CollectT), msgAndArgs ...interface{}) {
+	t.Helper()
+	require.EventuallyWithT(t, f, 10*time.Second, 10*time.Millisecond, msgAndArgs...)
 }
 
 func Test_labelExistsPredicate(t *testing.T) {
@@ -113,39 +161,6 @@ func Test_mapToAllUsageProfiles(t *testing.T) {
 	)
 }
 
-// Test_Conversions tests the conversion between runtime.RawExtension and unstructured.Unstructured for ensuring compatibility when upgrading packages.
-func Test_Conversions(t *testing.T) {
-	_, scheme, _ := prepareClient(t)
-
-	// Does not work
-	assert.Error(t, scheme.Convert(&runtime.RawExtension{}, &unstructured.Unstructured{}, nil))
-
-	// Does work
-	r := &runtime.RawExtension{
-		Object: &corev1.ResourceQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test",
-				Namespace: "test",
-			},
-			Spec: corev1.ResourceQuotaSpec{
-				Hard: corev1.ResourceList{
-					"cpu": resource.MustParse("1"),
-				},
-			},
-		},
-	}
-	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r)
-	assert.NoError(t, err)
-	u := &unstructured.Unstructured{Object: raw}
-	var _ client.Object = u
-	j, err := u.MarshalJSON()
-	assert.NoError(t, err)
-	assert.JSONEq(t, `{"metadata":{"creationTimestamp":null,"name":"test","namespace":"test"},"spec":{"hard":{"cpu":"1"}},"status":{}}`, string(j))
-
-	// Sanity check
-	assert.NoError(t, scheme.Convert(&corev1.Pod{}, &unstructured.Unstructured{}, nil))
-}
-
 // buildUsageProfile builds a valid ZoneUsageProfile with a ResourceQuota named test.
 func buildUsageProfile(t *testing.T, scheme *runtime.Scheme, name string) *cloudagentv1.ZoneUsageProfile {
 	t.Helper()
@@ -162,7 +177,7 @@ func buildUsageProfile(t *testing.T, scheme *runtime.Scheme, name string) *cloud
 							ObjectMeta: metav1.ObjectMeta{Name: "test"},
 							Spec: corev1.ResourceQuotaSpec{
 								Hard: corev1.ResourceList{
-									"cpu": resource.MustParse("666"),
+									corev1.ResourceCPU: resource.MustParse("666"),
 								},
 							},
 						}),

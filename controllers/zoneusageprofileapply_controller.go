@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -32,16 +31,17 @@ import (
 // ZoneUsageProfileApplyReconciler reconciles a ZoneUsageProfile object.
 // It applies the resources defined in the ZoneUsageProfile to all namespaces with the given organization label.
 // It dynamically watches the resources defined in the ZoneUsageProfile to keep those resources in sync.
-// Controller and Cache need to be set before using this reconciler to setup the dynamic watch.
-// Controller is set by the SetupWithManager function.
+// Reconciler must be setup with SetupWithManager.
 type ZoneUsageProfileApplyReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 
-	Controller controller.Controller
-	Cache      cache.Cache
-
+	// Cache is used to setup the dynamic watch.
+	Cache cache.Cache
+	// controller is used to setup the dynamic watch.
+	// It is set by the SetupWithManager function.
+	controller controller.Controller
 	// watchTracker keeps track of which resources are already being watched.
 	watchTracker sync.Map
 
@@ -144,10 +144,8 @@ func (r *ZoneUsageProfileApplyReconciler) applyResourceToNamespace(ctx context.C
 
 // ensureWatch ensures that the given GroupVersionKind is watched exactly once by the controller.
 func (r *ZoneUsageProfileApplyReconciler) ensureWatch(ctx context.Context, gvk schema.GroupVersionKind) error {
-	// TODO(bastjan): we'll need envtest to test dynamic watches
-	if r.Cache == nil || r.Controller == nil {
-		log.FromContext(ctx).Error(errors.New("no cache or controller available"), "skipping dynamic watch")
-		return nil
+	if r.Cache == nil || r.controller == nil {
+		return fmt.Errorf("no cache or controller available, unable to install dynamic watch")
 	}
 
 	if gvk.Empty() {
@@ -160,7 +158,7 @@ func (r *ZoneUsageProfileApplyReconciler) ensureWatch(ctx context.Context, gvk s
 		toWatch := &unstructured.Unstructured{}
 		toWatch.SetGroupVersionKind(gvk)
 
-		err = r.Controller.Watch(source.Kind(r.Cache, toWatch), handler.EnqueueRequestForOwner(r.Scheme, r.Client.RESTMapper(), &cloudagentv1.ZoneUsageProfile{}))
+		err = r.controller.Watch(source.Kind(r.Cache, toWatch), handler.EnqueueRequestForOwner(r.Scheme, r.Client.RESTMapper(), &cloudagentv1.ZoneUsageProfile{}))
 	})
 	return err
 }
@@ -183,7 +181,7 @@ func (r *ZoneUsageProfileApplyReconciler) SetupWithManager(mgr ctrl.Manager) err
 	if err != nil {
 		return fmt.Errorf("unable to create controller: %w", err)
 	}
-	r.Controller = c
+	r.controller = c
 	return nil
 }
 

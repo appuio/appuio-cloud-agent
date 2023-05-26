@@ -43,7 +43,7 @@ fuzz:
 
 .PHONY: test-go
 test-go: ## Run unit tests against code
-	go test -race -coverprofile cover.out -covermode atomic ./...
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -race -coverprofile cover.out -covermode atomic ./...
 
 .PHONY: fmt
 fmt: ## Run 'go fmt' against code
@@ -74,3 +74,12 @@ manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefin
 .PHONY: clean
 clean: ## Cleans local build artifacts
 	rm -rf docs/node_modules $(docs_out_dir) dist .cache
+
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
