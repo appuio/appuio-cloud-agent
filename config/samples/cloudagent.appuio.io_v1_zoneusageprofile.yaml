@@ -1,12 +1,20 @@
 apiVersion: cloudagent.appuio.io/v1
 kind: ZoneUsageProfile
 metadata:
-  labels:
-    app.kubernetes.io/name: ZoneUsageProfile
-    app.kubernetes.io/instance: ZoneUsageProfile-sample
-    app.kubernetes.io/part-of: appuio-cloud-agent
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: appuio-cloud-agent
-  name: ZoneUsageProfile-sample
+  name: sample
 spec:
-  # TODO(user): Add fields here
+  upstreamSpec:
+    namespaceCount: 10
+    resources:
+      organization-compute:
+        apiVersion: v1
+        kind: ResourceQuota
+        spec:
+          hard:
+            limits.cpu: "8"
+            limits.memory: 20Gi
+            pods: "45"
+            requests.cpu: "4"
+            requests.memory: 4Gi
+          scopes:
+            - NotTerminating

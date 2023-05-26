@@ -126,6 +126,16 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ratio")
 		os.Exit(1)
 	}
+	if err := (&controllers.ZoneUsageProfileApplyReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("usage-profile-apply-controller"),
+
+		OrganizationLabel: conf.OrganizationLabel,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ratio")
+		os.Exit(1)
+	}
 
 	// Currently unused, but will be used for the next kyverno replacements
 	psk := &skipper.PrivilegedUserSkipper{
