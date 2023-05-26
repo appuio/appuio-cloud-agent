@@ -2,32 +2,48 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
 	"github.com/appuio/appuio-cloud-agent/controllers/transformers"
 )
 
-// ZoneUsageProfileApplyReconciler reconciles a ZoneUsageProfile object
+// ZoneUsageProfileApplyReconciler reconciles a ZoneUsageProfile object.
+// It applies the resources defined in the ZoneUsageProfile to all namespaces with the given organization label.
+// It dynamically watches the resources defined in the ZoneUsageProfile to keep those resources in sync.
+// Controller and Cache need to be set before using this reconciler to setup the dynamic watch.
+// Controller is set by the SetupWithManager function.
 type ZoneUsageProfileApplyReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+
+	Controller controller.Controller
+	Cache      cache.Cache
+
+	// watchTracker keeps track of which resources are already being watched.
+	watchTracker sync.Map
 
 	OrganizationLabel string
 	Transformers      []transformers.Transformer
@@ -59,10 +75,10 @@ func (r *ZoneUsageProfileApplyReconciler) Reconcile(ctx context.Context, req ctr
 
 	var errors []error
 	for _, orgNs := range orgNsl.Items {
-		l = l.WithValues("namespace", orgNs.Name)
+		l := l.WithValues("namespace", orgNs.Name)
 		l.Info("Applying UsageProfile to Namespace")
 		for name, resource := range profile.Spec.UpstreamSpec.Resources {
-			l = l.WithValues("resourceName", name)
+			l := l.WithValues("resourceName", name)
 			l.Info("Applying UsageProfile Resource to Namespace")
 
 			if err := r.applyResourceToNamespace(ctx, name, orgNs, resource, profile); err != nil {
@@ -99,6 +115,10 @@ func (r *ZoneUsageProfileApplyReconciler) applyResourceToNamespace(ctx context.C
 		u.SetUnstructuredContent(raw)
 		u.SetNamespace(orgNs.Name)
 		u.SetName(name)
+		err := controllerutil.SetControllerReference(&profile, u, r.Scheme)
+		if err != nil {
+			return fmt.Errorf("unable to set controller reference: %w", err)
+		}
 
 		for _, t := range r.Transformers {
 			if err := t.Transform(ctx, u, &orgNs); err != nil {
@@ -115,6 +135,33 @@ func (r *ZoneUsageProfileApplyReconciler) applyResourceToNamespace(ctx context.C
 		return nil
 	})
 
+	if err := r.ensureWatch(ctx, u.GetObjectKind().GroupVersionKind()); err != nil {
+		return fmt.Errorf("unable to watch, object might not be reconciled: %w", err)
+	}
+
+	return err
+}
+
+// ensureWatch ensures that the given GroupVersionKind is watched exactly once by the controller.
+func (r *ZoneUsageProfileApplyReconciler) ensureWatch(ctx context.Context, gvk schema.GroupVersionKind) error {
+	// TODO(bastjan): we'll need envtest to test dynamic watches
+	if r.Cache == nil || r.Controller == nil {
+		log.FromContext(ctx).Error(errors.New("no cache or controller available"), "skipping dynamic watch")
+		return nil
+	}
+
+	if gvk.Empty() {
+		return fmt.Errorf("unable to watch empty GroupVersionKind")
+	}
+
+	var err error
+	once, _ := r.watchTracker.LoadOrStore(gvk, new(sync.Once))
+	once.(*sync.Once).Do(func() {
+		toWatch := &unstructured.Unstructured{}
+		toWatch.SetGroupVersionKind(gvk)
+
+		err = r.Controller.Watch(source.Kind(r.Cache, toWatch), handler.EnqueueRequestForOwner(r.Scheme, r.Client.RESTMapper(), &cloudagentv1.ZoneUsageProfile{}))
+	})
 	return err
 }
 
@@ -125,14 +172,19 @@ func (r *ZoneUsageProfileApplyReconciler) SetupWithManager(mgr ctrl.Manager) err
 		return fmt.Errorf("unable to create LabelSelectorPredicate: %w", err)
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	c, err := ctrl.NewControllerManagedBy(mgr).
 		For(&cloudagentv1.ZoneUsageProfile{}).
 		// Watch all namespaces and enqueue requests for all profiles on any change.
 		Watches(
 			&corev1.Namespace{},
 			handler.EnqueueRequestsFromMapFunc(mapToAllUsageProfiles(mgr.GetClient())),
 			builder.WithPredicates(orgPredicate)).
-		Complete(r)
+		Build(r)
+	if err != nil {
+		return fmt.Errorf("unable to create controller: %w", err)
+	}
+	r.Controller = c
+	return nil
 }
 
 // labelExistsPredicate returns a predicate that matches objects with the given label.

@@ -131,6 +131,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("usage-profile-apply-controller"),
+		Cache:    mgr.GetCache(),
 
 		OrganizationLabel: conf.OrganizationLabel,
 		Transformers: []transformers.Transformer{
