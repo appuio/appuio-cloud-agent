@@ -4,9 +4,6 @@ OrganizationLabel: appuio.io/organization
 # UserDefaultOrganizationAnnotation is the annotation the default organization setting for a user is stored in.
 UserDefaultOrganizationAnnotation: appuio.io/default-organization
 
-# DefaultNamespaceCountLimit is the maximum number of namespaces a user can create for an organization.
-DefaultNamespaceCountLimit: 50
-
 # QuotaOverrideNamespace is the namespace where the quota overrides for organizations are stored.
 QuotaOverrideNamespace: appuio-cloud
 

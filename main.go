@@ -178,8 +178,6 @@ func main() {
 			OrganizationLabel:                 conf.OrganizationLabel,
 			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,
 
-			DefaultNamespaceCountLimit: conf.DefaultNamespaceCountLimit,
-
 			SelectedProfile:        selectedUsageProfile,
 			QuotaOverrideNamespace: conf.QuotaOverrideNamespace,
 		},

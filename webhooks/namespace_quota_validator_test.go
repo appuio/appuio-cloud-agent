@@ -169,7 +169,6 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 
 				OrganizationLabel:                 orgLabel,
 				UserDefaultOrganizationAnnotation: userDefaultOrgAnnotation,
-				DefaultNamespaceCountLimit:        nsLimit,
 
 				SelectedProfile:        "test",
 				QuotaOverrideNamespace: "test",

@@ -37,8 +37,6 @@ type NamespaceQuotaValidator struct {
 	OrganizationLabel                 string
 	UserDefaultOrganizationAnnotation string
 
-	DefaultNamespaceCountLimit int
-
 	// SelectedProfile is the name of the ZoneUsageProfile to use for the quota
 	SelectedProfile string
 
@@ -91,16 +89,16 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 		l.Info("got default organization from user", "user", req.UserInfo.Username, "organization", organizationName)
 	}
 
-	nsCountLimit := v.DefaultNamespaceCountLimit
-	if v.SelectedProfile != "" {
-		var profile cloudagentv1.ZoneUsageProfile
-		if err := v.Client.Get(ctx, types.NamespacedName{Name: v.SelectedProfile}, &profile); err != nil {
-			l.Error(err, "error while fetching zone usage profile")
-			return admission.Errored(http.StatusInternalServerError, err)
-		}
-		nsCountLimit = profile.Spec.UpstreamSpec.NamespaceCount
-		l.Info("using zone usage profile for namespace count limit", "name", profile.Name, "limit", nsCountLimit)
+	if v.SelectedProfile == "" {
+		return admission.Denied("No ZoneUsageProfile selected")
 	}
+
+	var profile cloudagentv1.ZoneUsageProfile
+	if err := v.Client.Get(ctx, types.NamespacedName{Name: v.SelectedProfile}, &profile); err != nil {
+		l.Error(err, "error while fetching zone usage profile")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+	nsCountLimit := profile.Spec.UpstreamSpec.NamespaceCount
 
 	var overrideCM corev1.ConfigMap
 	if err := v.Client.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("override-%s", organizationName), Namespace: v.QuotaOverrideNamespace}, &overrideCM); err == nil {

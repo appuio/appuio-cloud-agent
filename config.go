@@ -46,9 +46,6 @@ type Config struct {
 	// DefaultOrganizationClusterRoles is a map containing the configuration for rolebindings that are created by default in each organization namespace.
 	// The keys are the name of default rolebindings to create and the values are the names of the clusterroles they bind to.
 	DefaultOrganizationClusterRoles map[string]string
-
-	// DefaultNamespaceCountLimit is the maximum number of namespaces a user can create for an organization.
-	DefaultNamespaceCountLimit int
 }
 
 func ConfigFromFile(path string) (c Config, warn []string, err error) {
