@@ -63,9 +63,6 @@ generate: ## Generate additional code and artifacts
 	@go generate ./...
 	@# Kubebuilder misses the scope field for the webhook generator
 	@yq eval -i '.webhooks[] |= with(select(.name == "validate-request-ratio.appuio.io"); .rules[] |= .scope = "Namespaced")' config/webhook/manifests.yaml
-	@## Kubebuilder misses the namespaceSelector field for the webhook generator
-	@# @yq eval -i '.webhooks[] |= with(select(.name == "validate-namespace-quota.appuio.io");                 .namespaceSelector = {"matchExpressions": [{"key": "appuio.io/organization", "operator": "Exists" }]})' config/webhook/manifests.yaml
-	@# @yq eval -i '.webhooks[] |= with(select(.name == "validate-namespace-quota-projectrequests.appuio.io"); .namespaceSelector = {"matchExpressions": [{"key": "appuio.io/organization", "operator": "Exists" }]})' config/webhook/manifests.yaml
 
 .PHONY: manifests
 manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
