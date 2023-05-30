@@ -55,6 +55,8 @@ const resourceOwnerLabel = "cloud-agent.appuio.io/usage-profile"
 //+kubebuilder:rbac:groups=cloudagent.appuio.io,resources=zoneusageprofiles/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cloudagent.appuio.io,resources=zoneusageprofiles/finalizers,verbs=update
 
+//+kubebuilder:rbac:groups=*,resources=*,verbs=get;list;watch;create;update;patch;delete
+
 // Reconcile applies a ZoneUsageProfile to all namespaces with the given organization label.
 // It returns an error if more than one ZoneUsageProfile try to manage a resource.
 func (r *ZoneUsageProfileApplyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
