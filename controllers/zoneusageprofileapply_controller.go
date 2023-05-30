@@ -47,6 +47,9 @@ type ZoneUsageProfileApplyReconciler struct {
 
 	OrganizationLabel string
 	Transformers      []transformers.Transformer
+
+	// SelectedProfile applies only selected profile, if set. Dynamic selection is in future tickets.
+	SelectedProfile string
 }
 
 const resourceOwnerLabel = "cloud-agent.appuio.io/usage-profile"
@@ -62,6 +65,11 @@ const resourceOwnerLabel = "cloud-agent.appuio.io/usage-profile"
 func (r *ZoneUsageProfileApplyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
 	l.Info("Reconciling ZoneUsageProfile")
+
+	if r.SelectedProfile != "" && r.SelectedProfile != req.Name {
+		l.Info("Skipping ZoneUsageProfile", "name", req.Name, "selectedProfile", r.SelectedProfile)
+		return ctrl.Result{}, nil
+	}
 
 	var profile cloudagentv1.ZoneUsageProfile
 	if err := r.Client.Get(ctx, req.NamespacedName, &profile); err != nil {

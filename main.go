@@ -65,6 +65,9 @@ func main() {
 	var controlAPIKubeconfig string
 	flag.StringVar(&controlAPIKubeconfig, "kubeconfig-control-api", "kubeconfig-control-api", "Path to the kubeconfig file to query the control API")
 
+	var selectedUsageProfile string
+	flag.StringVar(&selectedUsageProfile, "usage-profile", "", "UsageProfile to use. Applies all profiles if empty. Dynamic selection is not supported yet.")
+
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -136,6 +139,8 @@ func main() {
 		Transformers: []transformers.Transformer{
 			transformers.NewResourceQuotaTransformer("resourcequota.appuio.io"),
 		},
+
+		SelectedProfile: selectedUsageProfile,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ratio")
 		os.Exit(1)
