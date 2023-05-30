@@ -22,6 +22,8 @@ import (
 // +kubebuilder:webhook:path=/validate-namespace-quota,name=validate-namespace-quota.appuio.io,admissionReviewVersions=v1,sideEffects=none,mutating=false,failurePolicy=Fail,groups="",resources=namespaces,verbs=create,versions=v1,matchPolicy=equivalent
 // +kubebuilder:webhook:path=/validate-namespace-quota,name=validate-namespace-quota-projectrequests.appuio.io,admissionReviewVersions=v1,sideEffects=none,mutating=false,failurePolicy=Fail,groups=project.openshift.io,resources=projectrequests,verbs=create,versions=v1,matchPolicy=equivalent
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups=user.openshift.io,resources=users,verbs=get;list;watch
 
 // NamespaceQuotaValidator checks namespaces for allowed node selectors.
 type NamespaceQuotaValidator struct {
