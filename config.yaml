@@ -7,6 +7,9 @@ UserDefaultOrganizationAnnotation: appuio.io/default-organization
 # DefaultNamespaceCountLimit is the maximum number of namespaces a user can create for an organization.
 DefaultNamespaceCountLimit: 50
 
+# QuotaOverrideNamespace is the namespace where the quota overrides for organizations are stored.
+QuotaOverrideNamespace: appuio-cloud
+
 # The fair use limit of memory usage per CPU core.
 # It is possible to select limits by node selector labels.
 MemoryPerCoreLimits:

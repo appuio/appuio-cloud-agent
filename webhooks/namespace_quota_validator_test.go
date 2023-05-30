@@ -2,8 +2,9 @@ package webhooks
 
 import (
 	"context"
+	"testing"
 
-	"github.com/appuio/appuio-cloud-agent/skipper"
+	controlv1 "github.com/appuio/control-api/apis/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"testing"
+	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
+	"github.com/appuio/appuio-cloud-agent/skipper"
 )
 
 func TestNamespaceQuotaValidator_Handle(t *testing.T) {
@@ -47,6 +49,31 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 				newNamespace("an", nil, nil), newNamespace("bn", nil, nil),
 			},
 			object: &projectv1.ProjectRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Labels: map[string]string{
+						orgLabel: "testorg",
+					},
+				},
+			},
+			allowed: true,
+		},
+		"Allow Namespace Override": {
+			initObjects: []client.Object{
+				newNamespace("a", map[string]string{orgLabel: "testorg"}, nil),
+				newNamespace("b", map[string]string{orgLabel: "testorg"}, nil),
+				newNamespace("c", map[string]string{orgLabel: "testorg"}, nil),
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "override-testorg",
+						Namespace: "test",
+					},
+					Data: map[string]string{
+						"namespaceQuota": "4",
+					},
+				},
+			},
+			object: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
 					Labels: map[string]string{
@@ -142,10 +169,22 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 				OrganizationLabel:                 orgLabel,
 				UserDefaultOrganizationAnnotation: userDefaultOrgAnnotation,
 				DefaultNamespaceCountLimit:        nsLimit,
+
+				SelectedProfile:        "test",
+				QuotaOverrideNamespace: "test",
 			}
 			subject.InjectDecoder(dec)
 
-			scheme.ObjectKinds(test.object)
+			require.NoError(t, c.Create(ctx, &cloudagentv1.ZoneUsageProfile{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: cloudagentv1.ZoneUsageProfileSpec{
+					UpstreamSpec: controlv1.UsageProfileSpec{
+						NamespaceCount: nsLimit,
+					},
+				},
+			}))
 
 			res := subject.Handle(ctx, admissionRequestForObject(t, test.object, scheme))
 			require.Equal(t, test.allowed, res.Allowed)

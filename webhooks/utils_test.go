@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/appuio/appuio-cloud-agent/testutils"
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	"github.com/stretchr/testify/require"
@@ -17,6 +16,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
+	"github.com/appuio/appuio-cloud-agent/testutils"
 )
 
 func admissionRequestForObject(t *testing.T, object client.Object, scheme *runtime.Scheme) admission.Request {
@@ -73,6 +75,7 @@ func prepareClient(t *testing.T, initObjs ...client.Object) (client.WithWatch, *
 	require.NoError(t, clientgoscheme.AddToScheme(scheme))
 	require.NoError(t, userv1.AddToScheme(scheme))
 	require.NoError(t, projectv1.AddToScheme(scheme))
+	require.NoError(t, cloudagentv1.AddToScheme(scheme))
 
 	decoder := admission.NewDecoder(scheme)
 

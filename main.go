@@ -165,6 +165,9 @@ func main() {
 			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,
 
 			DefaultNamespaceCountLimit: conf.DefaultNamespaceCountLimit,
+
+			SelectedProfile:        selectedUsageProfile,
+			QuotaOverrideNamespace: conf.QuotaOverrideNamespace,
 		},
 	})
 

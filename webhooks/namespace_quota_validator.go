@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	userv1 "github.com/openshift/api/user/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
 	"github.com/appuio/appuio-cloud-agent/skipper"
 )
 
@@ -32,6 +36,12 @@ type NamespaceQuotaValidator struct {
 	UserDefaultOrganizationAnnotation string
 
 	DefaultNamespaceCountLimit int
+
+	// SelectedProfile is the name of the ZoneUsageProfile to use for the quota
+	SelectedProfile string
+
+	// QuotaOverrideNamespace is the namespace in which the quota overrides are stored
+	QuotaOverrideNamespace string
 }
 
 // Handle handles the admission requests
@@ -78,6 +88,31 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 		organizationName = don
 	}
 
+	nsCountLimit := v.DefaultNamespaceCountLimit
+	if v.SelectedProfile != "" {
+		var profile cloudagentv1.ZoneUsageProfile
+		if err := v.Client.Get(ctx, types.NamespacedName{Name: v.SelectedProfile}, &profile); err != nil {
+			l.Error(err, "error while fetching zone usage profile")
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		nsCountLimit = profile.Spec.UpstreamSpec.NamespaceCount
+		l.Info("using zone usage profile for namespace count limit", "name", profile.Name, "limit", nsCountLimit)
+	}
+
+	var overrideCM corev1.ConfigMap
+	if err := v.Client.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("override-%s", organizationName), Namespace: v.QuotaOverrideNamespace}, &overrideCM); err == nil {
+		if overrideCM.Data["namespaceQuota"] != "" {
+			nsCountLimit, err = strconv.Atoi(overrideCM.Data["namespaceQuota"])
+			if err != nil {
+				l.Error(err, "error while parsing namespace quota")
+				return admission.Errored(http.StatusInternalServerError, err)
+			}
+		}
+	} else if !apierrors.IsNotFound(err) {
+		l.Error(err, "error while fetching override configmap")
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
 	// count namespaces for organization
 	var nsList corev1.NamespaceList
 	if err := v.Client.List(ctx, &nsList, client.MatchingLabels{
@@ -86,11 +121,11 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 		l.Error(err, "error while listing namespaces")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	if len(nsList.Items) >= v.DefaultNamespaceCountLimit {
-		l.V(1).Info("denied: namespace count limit reached", "limit", v.DefaultNamespaceCountLimit, "count", len(nsList.Items))
+	if len(nsList.Items) >= nsCountLimit {
+		l.V(1).Info("denied: namespace count limit reached", "limit", nsCountLimit, "count", len(nsList.Items))
 		return admission.Denied(fmt.Sprintf(
 			"You cannot create more than %d namespaces for organization %q. Please contact support to have your quota raised.",
-			v.DefaultNamespaceCountLimit, organizationName))
+			nsCountLimit, organizationName))
 	}
 
 	return admission.Allowed("allowed")
