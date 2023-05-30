@@ -71,6 +71,10 @@ func main() {
 	var selectedUsageProfile string
 	flag.StringVar(&selectedUsageProfile, "usage-profile", "", "UsageProfile to use. Applies all profiles if empty. Dynamic selection is not supported yet.")
 
+	var qps, burst int
+	flag.IntVar(&qps, "qps", 20, "QPS to use for the controller-runtime client")
+	flag.IntVar(&burst, "burst", 100, "Burst to use for the controller-runtime client")
+
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -116,7 +120,10 @@ func main() {
 		controlAPICluster = cl
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	lconf := ctrl.GetConfigOrDie()
+	lconf.QPS = float32(qps)
+	lconf.Burst = burst
+	mgr, err := ctrl.NewManager(lconf, ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     *metricsAddr,
 		Port:                   *webhookPort,
