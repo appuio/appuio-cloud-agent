@@ -129,7 +129,8 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 					Name: "test",
 				},
 			},
-			allowed: false,
+			allowed:      false,
+			matchMessage: "\"testorg\"",
 		},
 
 		"Deny NoOrganization": {
