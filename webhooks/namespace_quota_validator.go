@@ -86,6 +86,7 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 			return admission.Denied("There is no organization label and the user has no default organization set.")
 		}
 		organizationName = don
+		l.Info("got default organization from user", "user", req.UserInfo.Username, "organization", organizationName)
 	}
 
 	nsCountLimit := v.DefaultNamespaceCountLimit
