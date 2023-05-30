@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
@@ -28,6 +29,24 @@ func FromKubeConfig(kubeconfig []byte, scheme *runtime.Scheme) (ClusterSource, e
 	if err != nil {
 		return nil, fmt.Errorf("unable to create rest config from kubeconfig: %w", err)
 	}
+	clst, err := cluster.New(rc, func(o *cluster.Options) { o.Scheme = scheme })
+	if err != nil {
+		return nil, fmt.Errorf("unable to setup cluster: %w", err)
+	}
+
+	return &clusterSource{
+		Cluster: clst,
+	}, nil
+}
+
+// FromURLAndBearerToken creates a ClusterSource from a url and token.
+// If more complex configuration is needed, use FromKubeConfig.
+func FromURLAndBearerToken(url, token string, scheme *runtime.Scheme) (ClusterSource, error) {
+	rc := &rest.Config{
+		Host:        url, // yes this is the correct field, host accepts a url
+		BearerToken: token,
+	}
+
 	clst, err := cluster.New(rc, func(o *cluster.Options) { o.Scheme = scheme })
 	if err != nil {
 		return nil, fmt.Errorf("unable to setup cluster: %w", err)

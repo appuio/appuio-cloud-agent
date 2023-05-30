@@ -65,6 +65,9 @@ func main() {
 	var controlAPIKubeconfig string
 	flag.StringVar(&controlAPIKubeconfig, "kubeconfig-control-api", "kubeconfig-control-api", "Path to the kubeconfig file to query the control API")
 
+	var controlAPIURL string
+	flag.StringVar(&controlAPIURL, "control-api-url", "", "URL of the control API. If set agent does not use `-kubeconfig-control-api`. Expects a bearer token in `CONTROL_API_BEARER_TOKEN` env var.")
+
 	var selectedUsageProfile string
 	flag.StringVar(&selectedUsageProfile, "usage-profile", "", "UsageProfile to use. Applies all profiles if empty. Dynamic selection is not supported yet.")
 
@@ -86,20 +89,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	if controlAPIKubeconfig == "" {
-		setupLog.Info("no control API kubeconfig provided, aborting")
-		os.Exit(1)
-	}
-
-	cac, err := os.ReadFile(controlAPIKubeconfig)
-	if err != nil {
-		setupLog.Error(err, "unable to read control API kubeconfig")
-		os.Exit(1)
-	}
-	controlAPICluster, err := clustersource.FromKubeConfig(cac, scheme)
-	if err != nil {
-		setupLog.Error(err, "unable to setup control-api manager")
-		os.Exit(1)
+	var controlAPICluster clustersource.ClusterSource
+	if controlAPIURL != "" {
+		tk := os.Getenv("CONTROL_API_BEARER_TOKEN")
+		if tk == "" {
+			setupLog.Error(err, "CONTROL_API_BEARER_TOKEN env var not set")
+			os.Exit(1)
+		}
+		cl, err := clustersource.FromURLAndBearerToken(controlAPIURL, tk, scheme)
+		if err != nil {
+			setupLog.Error(err, "unable to setup control-api manager")
+			os.Exit(1)
+		}
+		controlAPICluster = cl
+	} else {
+		cac, err := os.ReadFile(controlAPIKubeconfig)
+		if err != nil {
+			setupLog.Error(err, "unable to read control API kubeconfig")
+			os.Exit(1)
+		}
+		cl, err := clustersource.FromKubeConfig(cac, scheme)
+		if err != nil {
+			setupLog.Error(err, "unable to setup control-api manager")
+			os.Exit(1)
+		}
+		controlAPICluster = cl
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
