@@ -7,6 +7,7 @@ import (
 	"time"
 
 	controlv1 "github.com/appuio/control-api/apis/v1"
+	"github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -34,6 +36,10 @@ func Test_ZoneUsageProfileApplyReconciler_Reconcile(t *testing.T) {
 	defer stop()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	l := testr.NewWithOptions(t, testr.Options{Verbosity: 9001})
+	ctx = log.IntoContext(ctx, l)
+	log.SetLogger(l)
 
 	_, scheme, recorder := prepareClient(t)
 	mgr, err := manager.New(cfg, manager.Options{Scheme: scheme})
@@ -112,7 +118,7 @@ func Test_ZoneUsageProfileApplyReconciler_Reconcile(t *testing.T) {
 
 func requireEventually(t *testing.T, f func(collect *assert.CollectT), msgAndArgs ...interface{}) {
 	t.Helper()
-	require.EventuallyWithT(t, f, 10*time.Second, 10*time.Millisecond, msgAndArgs...)
+	require.EventuallyWithT(t, f, 10*time.Second, time.Second/10, msgAndArgs...)
 }
 
 func Test_labelExistsPredicate(t *testing.T) {
