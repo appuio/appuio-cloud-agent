@@ -141,7 +141,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Currently unused, but will be used for the next kyverno replacements
 	psk := &skipper.PrivilegedUserSkipper{
 		Client: mgr.GetClient(),
 
