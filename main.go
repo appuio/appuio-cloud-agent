@@ -41,7 +41,6 @@ var (
 )
 
 //go:generate go run sigs.k8s.io/controller-tools/cmd/controller-gen object paths="./..."
-//go:generate go run sigs.k8s.io/controller-tools/cmd/controller-gen rbac:roleName=appuio-cloud-agent webhook paths="./..."
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
