@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/appuio/control-api v0.28.0
+	github.com/go-logr/logr v1.2.4
 	github.com/minio/pkg v1.7.2
 	github.com/openshift/api v0.0.0-20230426102702-398424d53f74 // release-4.11
 	github.com/stretchr/testify v1.8.3
@@ -30,7 +31,6 @@ require (
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fatih/color v1.14.1 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
