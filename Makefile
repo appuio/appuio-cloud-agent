@@ -61,12 +61,12 @@ lint: fmt vet generate manifests ## All-in-one linting
 .PHONY: generate
 generate: ## Generate additional code and artifacts
 	@go generate ./...
-	@# Kubebuilder misses the scope field for the webhook generator
-	@yq eval -i '.webhooks[] |= with(select(.name == "validate-request-ratio.appuio.io"); .rules[] |= .scope = "Namespaced")' config/webhook/manifests.yaml
 
 .PHONY: manifests
 manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	go run sigs.k8s.io/controller-tools/cmd/controller-gen rbac:roleName=appuio-cloud-agent crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	@# Kubebuilder misses the scope field for the webhook generator
+	@yq eval -i '.webhooks[] |= with(select(.name == "validate-request-ratio.appuio.io"); .rules[] |= .scope = "Namespaced")' config/webhook/manifests.yaml
 
 .PHONY: clean
 clean: ## Cleans local build artifacts
