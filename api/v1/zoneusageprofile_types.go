@@ -16,6 +16,7 @@ type ZoneUsageProfileSpec struct {
 
 // ZoneUsageProfileStatus defines the observed state of ZoneUsageProfile
 type ZoneUsageProfileStatus struct {
+	// TODO(bastjan): track applied resources to be able to clean up.
 }
 
 //+kubebuilder:object:root=true
