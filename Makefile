@@ -66,7 +66,7 @@ generate: ## Generate additional code and artifacts
 
 .PHONY: manifests
 manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	go run sigs.k8s.io/controller-tools/cmd/controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen rbac:roleName=appuio-cloud-agent crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: clean
 clean: ## Cleans local build artifacts
