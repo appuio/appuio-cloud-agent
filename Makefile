@@ -42,7 +42,7 @@ fuzz:
 	go test ./ratio -fuzztime 1m -fuzz .
 
 .PHONY: test-go
-test-go: ## Run unit tests against code
+test-go: envtest ## Run unit tests against code
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -race -coverprofile cover.out -covermode atomic ./...
 
 .PHONY: fmt
