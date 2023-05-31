@@ -96,3 +96,60 @@ while read -r patch; do
    kubectl patch mutatingwebhookconfigurations mutating-webhook-configuration --type=json -p "${patch}"
 done <<< "$patches"
 ```
+
+### Connect agent to control-api
+
+Create ServiceAccount in control-api and save token to kubeconfig.
+
+```sh
+# Switch to the control-api cluster you want to create the access for
+# $ kubectx appuio-api-integration
+# Update the zone name to match your name
+ZONE_NAME=my-test-zone
+
+# Create a service account and the token
+NAMESPACE=default
+mkdir -p tk && cat <<EOF > tk/kustomization.yaml
+resources:
+- ../config/foreign_rbac
+namespace: ${NAMESPACE}
+namePrefix: ${ZONE_NAME}-
+EOF
+kubectl apply -k tk
+
+CONTEXT=$(kubectl config current-context)
+NEW_CONTEXT=control-api-sa
+KUBECONFIG_FILE="kubeconfig-control-api"
+SECRET_NAME=${ZONE_NAME}-cloud-agent
+TOKEN_DATA=$(kubectl get secret ${SECRET_NAME} \
+  --context ${CONTEXT} \
+  --namespace ${NAMESPACE} \
+  -o jsonpath='{.data.token}')
+TOKEN=$(echo ${TOKEN_DATA} | base64 -d)
+
+rm -rf tk
+
+# Create kubeconfig
+kubectl config view --raw > ${KUBECONFIG_FILE}.full.tmp
+kubectl --kubeconfig ${KUBECONFIG_FILE}.full.tmp config use-context ${CONTEXT}
+kubectl --kubeconfig ${KUBECONFIG_FILE}.full.tmp \
+  config view --flatten --minify > ${KUBECONFIG_FILE}.tmp
+# Rename context
+kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp \
+  rename-context ${CONTEXT} ${NEW_CONTEXT}
+# Create token user
+kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp \
+  set-credentials ${CONTEXT}-${NAMESPACE}-token-user \
+  --token ${TOKEN}
+kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp \
+  set-context ${NEW_CONTEXT} --user ${CONTEXT}-${NAMESPACE}-token-user
+# Set context to correct namespace
+kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp \
+  set-context ${NEW_CONTEXT} --namespace ${NAMESPACE}
+# Flatten/minify kubeconfig
+kubectl config --kubeconfig ${KUBECONFIG_FILE}.tmp \
+  view --flatten --minify > ${KUBECONFIG_FILE}
+# Remove tmp
+rm ${KUBECONFIG_FILE}.full.tmp
+rm ${KUBECONFIG_FILE}.tmp
+```
