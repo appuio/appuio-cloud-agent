@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
@@ -86,6 +87,10 @@ func (r *ZoneUsageProfileApplyReconciler) Reconcile(ctx context.Context, req ctr
 	var errors []error
 	for _, orgNs := range orgNsl.Items {
 		l := l.WithValues("namespace", orgNs.Name)
+		if orgNs.DeletionTimestamp != nil && time.Now().After(orgNs.DeletionTimestamp.Time) {
+			l.Info("Skipping Namespace", "reason", "Namespace is being deleted")
+			continue
+		}
 		l.Info("Applying UsageProfile to Namespace")
 		for name, resource := range profile.Spec.UpstreamSpec.Resources {
 			l := l.WithValues("resourceName", name)
