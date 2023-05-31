@@ -3,7 +3,6 @@ resources:
 - role.yaml
 - service_account.yaml
 
-namePrefix: my-zone-
 namespace: default
 
 configurations:
