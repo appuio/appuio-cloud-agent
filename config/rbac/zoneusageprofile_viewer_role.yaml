@@ -1,0 +1,27 @@
+# permissions for end users to view zoneusageprofiles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: ZoneUsageProfile-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: appuio-cloud-agent
+    app.kubernetes.io/part-of: appuio-cloud-agent
+    app.kubernetes.io/managed-by: kustomize
+  name: ZoneUsageProfile-viewer-role
+rules:
+- apiGroups:
+  - cloudagent.appuio.io
+  resources:
+  - zoneusageprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cloudagent.appuio.io
+  resources:
+  - zoneusageprofiles/status
+  verbs:
+  - get

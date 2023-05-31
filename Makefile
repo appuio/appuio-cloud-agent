@@ -42,8 +42,8 @@ fuzz:
 	go test ./ratio -fuzztime 1m -fuzz .
 
 .PHONY: test-go
-test-go: ## Run unit tests against code
-	go test -race -coverprofile cover.out -covermode atomic ./...
+test-go: envtest ## Run unit tests against code
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -race -coverprofile cover.out -covermode atomic ./...
 
 .PHONY: fmt
 fmt: ## Run 'go fmt' against code
@@ -54,16 +54,29 @@ vet: ## Run 'go vet' against code
 	go vet ./...
 
 .PHONY: lint
-lint: fmt vet generate ## All-in-one linting
+lint: fmt vet generate manifests ## All-in-one linting
 	@echo 'Check for uncommitted changes ...'
 	git diff --exit-code
 
 .PHONY: generate
 generate: ## Generate additional code and artifacts
 	@go generate ./...
+
+.PHONY: manifests
+manifests: ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	go run sigs.k8s.io/controller-tools/cmd/controller-gen rbac:roleName=appuio-cloud-agent crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	@# Kubebuilder misses the scope field for the webhook generator
 	@yq eval -i '.webhooks[] |= with(select(.name == "validate-request-ratio.appuio.io"); .rules[] |= .scope = "Namespaced")' config/webhook/manifests.yaml
 
 .PHONY: clean
 clean: ## Cleans local build artifacts
 	rm -rf docs/node_modules $(docs_out_dir) dist .cache
+
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest

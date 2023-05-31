@@ -1,0 +1,65 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.3
+  creationTimestamp: null
+  name: zoneusageprofiles.cloudagent.appuio.io
+spec:
+  group: cloudagent.appuio.io
+  names:
+    kind: ZoneUsageProfile
+    listKind: ZoneUsageProfileList
+    plural: zoneusageprofiles
+    singular: zoneusageprofile
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ZoneUsageProfile is the Schema for the ZoneUsageProfiles API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ZoneUsageProfileSpec defines the desired state of ZoneUsageProfile
+            properties:
+              upstreamSpec:
+                description: UpstreamSpec is the spec of the upstream UsageProfile
+                properties:
+                  namespaceCount:
+                    description: NamespaceCount is the number of namespaces an organization
+                      with this usage profile can create per zone.
+                    type: integer
+                  resources:
+                    additionalProperties:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    description: Resources is the set of resources which are created
+                      in each namespace for which the usage profile is applied. The
+                      key is used as the name of the resource and the value is the
+                      resource definition.
+                    type: object
+                type: object
+            required:
+            - upstreamSpec
+            type: object
+          status:
+            description: ZoneUsageProfileStatus defines the observed state of ZoneUsageProfile
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

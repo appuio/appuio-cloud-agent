@@ -14,6 +14,12 @@ type Config struct {
 	// OrganizationLabel is the label used to mark namespaces to belong to an organization
 	OrganizationLabel string
 
+	// UserDefaultOrganizationAnnotation is the annotation the default organization setting for a user is stored in.
+	UserDefaultOrganizationAnnotation string
+
+	// QuotaOverrideNamespace is the namespace where the quota overrides for organizations are stored.
+	QuotaOverrideNamespace string
+
 	// MemoryPerCoreLimit is the fair use limit of memory usage per CPU core
 	// it is deprecated and will be removed in a future version.
 	// Use MemoryPerCoreLimits: {Limit: "XGi"} instead.

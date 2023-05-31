@@ -4,18 +4,27 @@ import (
 	"encoding/json"
 	"testing"
 
+	projectv1 "github.com/openshift/api/project/v1"
+	userv1 "github.com/openshift/api/user/v1"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
+	"github.com/appuio/appuio-cloud-agent/testutils"
 )
 
-func admissionRequestForObject(t *testing.T, object client.Object) admission.Request {
+func admissionRequestForObject(t *testing.T, object client.Object, scheme *runtime.Scheme) admission.Request {
 	t.Helper()
 
+	testutils.EnsureGroupVersionKind(t, scheme, object)
 	gvk := object.GetObjectKind().GroupVersionKind()
 
 	raw, err := json.Marshal(object)
@@ -41,6 +50,55 @@ func admissionRequestForObject(t *testing.T, object client.Object) admission.Req
 			Object: runtime.RawExtension{
 				Raw: raw,
 			},
+		},
+	}
+}
+
+func newNamespace(name string, labels, annotations map[string]string) *corev1.Namespace {
+	return &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+	}
+}
+
+func prepareClient(t *testing.T, initObjs ...client.Object) (client.WithWatch, *runtime.Scheme, *admission.Decoder) {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, clientgoscheme.AddToScheme(scheme))
+	require.NoError(t, userv1.AddToScheme(scheme))
+	require.NoError(t, projectv1.AddToScheme(scheme))
+	require.NoError(t, cloudagentv1.AddToScheme(scheme))
+
+	decoder := admission.NewDecoder(scheme)
+
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(initObjs...).
+		Build()
+
+	return client, scheme, decoder
+}
+
+func newPod(namespace, name string, nodeSelector map[string]string) *corev1.Pod {
+	return &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: corev1.PodSpec{
+			NodeSelector: nodeSelector,
 		},
 	}
 }

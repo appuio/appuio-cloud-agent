@@ -6,15 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/appuio/appuio-cloud-agent/skipper"
 )
@@ -28,9 +21,7 @@ func Test_PodNodeSelectorMutator_Handle(t *testing.T) {
 		newNamespace("ns-no-annotations", nil, nil),
 	}
 
-	scheme := runtime.NewScheme()
-	require.NoError(t, corev1.AddToScheme(scheme))
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(crs...).Build()
+	c, scheme, decoder := prepareClient(t, crs...)
 
 	testCases := []struct {
 		name string
@@ -95,60 +86,18 @@ func Test_PodNodeSelectorMutator_Handle(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			subject := PodNodeSelectorMutator{
+				Decoder:                                decoder,
 				Client:                                 c,
 				Skipper:                                skipper.StaticSkipper{},
 				DefaultNodeSelector:                    tc.defaultNodeSelector,
 				DefaultNamespaceNodeSelectorAnnotation: nodeSelAnnotation,
 			}
-			subject.InjectDecoder(decoder(t))
 
 			pod := newPod(tc.namespace, "test", tc.nodeSelector)
-			resp := subject.Handle(context.Background(), admissionRequestForObject(t, pod))
+			resp := subject.Handle(context.Background(), admissionRequestForObject(t, pod, scheme))
 			t.Log("Response:", resp.Result.Reason, resp.Result.Message)
 			require.ElementsMatch(t, tc.patch, resp.Patches)
 			require.Equal(t, tc.allowed, resp.Allowed)
 		})
-	}
-}
-
-func newNamespace(name string, labels, annotations map[string]string) *corev1.Namespace {
-	return &corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Namespace",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Labels:      labels,
-			Annotations: annotations,
-		},
-	}
-}
-
-func decoder(t *testing.T) *admission.Decoder {
-	t.Helper()
-
-	scheme := runtime.NewScheme()
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	decoder, err := admission.NewDecoder(scheme)
-	require.NoError(t, err)
-
-	return decoder
-}
-
-func newPod(namespace, name string, nodeSelector map[string]string) *corev1.Pod {
-	return &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: corev1.PodSpec{
-			NodeSelector: nodeSelector,
-		},
 	}
 }

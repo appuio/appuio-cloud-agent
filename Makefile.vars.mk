@@ -14,6 +14,9 @@ IMG_TAG ?= latest
 # Image URL to use all building/pushing image targets
 CONTAINER_IMG ?= local.dev/$(PROJECT_OWNER)/$(PROJECT_NAME):$(IMG_TAG)
 
+LOCALBIN ?= $(shell pwd)/bin
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+ENVTEST_K8S_VERSION = 1.26.1
 
 ## KIND:setup
 

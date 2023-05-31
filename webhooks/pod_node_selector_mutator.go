@@ -20,7 +20,7 @@ import (
 
 // PodNodeSelectorMutator checks namespaces for allowed node selectors.
 type PodNodeSelectorMutator struct {
-	decoder *admission.Decoder
+	Decoder *admission.Decoder
 
 	// Client is used to fetch namespace metadata
 	Client client.Reader
@@ -63,7 +63,7 @@ func (v *PodNodeSelectorMutator) Handle(ctx context.Context, req admission.Reque
 	}
 
 	var rawPod unstructured.Unstructured
-	if err := v.decoder.Decode(req, &rawPod); err != nil {
+	if err := v.Decoder.Decode(req, &rawPod); err != nil {
 		l.Error(err, "failed to decode request")
 		return admission.Errored(400, err)
 	}
@@ -101,12 +101,6 @@ func (v *PodNodeSelectorMutator) Handle(ctx context.Context, req admission.Reque
 
 	l.V(1).Info("built patch", "nodeSelector", nodeSel, "defaults", defaults, "patch", patches)
 	return admission.Patched("added default node selector", patches...)
-}
-
-// InjectDecoder injects a Admission request decoder
-func (v *PodNodeSelectorMutator) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
 }
 
 func (v *PodNodeSelectorMutator) defaultLabels(ns corev1.Namespace) (labels.Set, error) {

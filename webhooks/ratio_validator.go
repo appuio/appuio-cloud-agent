@@ -27,7 +27,7 @@ import (
 
 // RatioValidator checks for every action in a namespace whether the Memory to CPU ratio limit is exceeded and will return a warning if it is.
 type RatioValidator struct {
-	decoder *admission.Decoder
+	Decoder *admission.Decoder
 	Client  client.Client
 
 	Ratio       ratioFetcher
@@ -135,19 +135,19 @@ func (v *RatioValidator) recordObject(ctx context.Context, r *ratio.Ratio, req a
 	switch req.Kind.Kind {
 	case "Pod":
 		pod := corev1.Pod{}
-		if err := v.decoder.Decode(req, &pod); err != nil {
+		if err := v.Decoder.Decode(req, &pod); err != nil {
 			return r, err
 		}
 		r = r.RecordPod(pod)
 	case "Deployment":
 		deploy := appsv1.Deployment{}
-		if err := v.decoder.Decode(req, &deploy); err != nil {
+		if err := v.Decoder.Decode(req, &deploy); err != nil {
 			return r, err
 		}
 		r = r.RecordDeployment(deploy)
 	case "StatefulSet":
 		sts := appsv1.StatefulSet{}
-		if err := v.decoder.Decode(req, &sts); err != nil {
+		if err := v.Decoder.Decode(req, &sts); err != nil {
 			return r, err
 		}
 		r = r.RecordStatefulSet(sts)
@@ -159,19 +159,19 @@ func (v *RatioValidator) getNodeSelector(req admission.Request) (map[string]stri
 	switch req.Kind.Kind {
 	case "Pod":
 		pod := corev1.Pod{}
-		if err := v.decoder.Decode(req, &pod); err != nil {
+		if err := v.Decoder.Decode(req, &pod); err != nil {
 			return nil, err
 		}
 		return pod.Spec.NodeSelector, nil
 	case "Deployment":
 		deploy := appsv1.Deployment{}
-		if err := v.decoder.Decode(req, &deploy); err != nil {
+		if err := v.Decoder.Decode(req, &deploy); err != nil {
 			return nil, err
 		}
 		return deploy.Spec.Template.Spec.NodeSelector, nil
 	case "StatefulSet":
 		sts := appsv1.StatefulSet{}
-		if err := v.decoder.Decode(req, &sts); err != nil {
+		if err := v.Decoder.Decode(req, &sts); err != nil {
 			return nil, err
 		}
 		return sts.Spec.Template.Spec.NodeSelector, nil
@@ -186,12 +186,6 @@ func (v *RatioValidator) getDefaultNodeSelectorFromNamespace(ctx context.Context
 		return nil, err
 	}
 	return labels.ConvertSelectorToLabelsMap(ns.Annotations[v.DefaultNamespaceNodeSelectorAnnotation])
-}
-
-// InjectDecoder injects a Admission request decoder
-func (v *RatioValidator) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
 }
 
 func errored(code int32, err error) admission.Response {

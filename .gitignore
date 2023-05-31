@@ -2,6 +2,9 @@
 dist/
 .github/release-notes.md
 
+# Tools
+bin/
+
 # Build
 appuio-cloud-agent
 *.out
@@ -19,3 +22,6 @@ webhook-certs/
 
 # fuzz testcases
 */testdata/fuzz/
+
+# runing locally
+kubeconfig-control-api
