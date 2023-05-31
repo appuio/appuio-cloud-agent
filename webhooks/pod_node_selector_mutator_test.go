@@ -86,12 +86,12 @@ func Test_PodNodeSelectorMutator_Handle(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			subject := PodNodeSelectorMutator{
+				Decoder:                                decoder,
 				Client:                                 c,
 				Skipper:                                skipper.StaticSkipper{},
 				DefaultNodeSelector:                    tc.defaultNodeSelector,
 				DefaultNamespaceNodeSelectorAnnotation: nodeSelAnnotation,
 			}
-			subject.InjectDecoder(decoder)
 
 			pod := newPod(tc.namespace, "test", tc.nodeSelector)
 			resp := subject.Handle(context.Background(), admissionRequestForObject(t, pod, scheme))

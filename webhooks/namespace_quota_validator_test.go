@@ -164,6 +164,7 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c, scheme, dec := prepareClient(t, test.initObjects...)
 			subject := &NamespaceQuotaValidator{
+				Decoder: dec,
 				Client:  c,
 				Skipper: skipper.StaticSkipper{ShouldSkip: false},
 
@@ -173,7 +174,6 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 				SelectedProfile:        "test",
 				QuotaOverrideNamespace: "test",
 			}
-			subject.InjectDecoder(dec)
 
 			require.NoError(t, c.Create(ctx, &cloudagentv1.ZoneUsageProfile{
 				ObjectMeta: metav1.ObjectMeta{

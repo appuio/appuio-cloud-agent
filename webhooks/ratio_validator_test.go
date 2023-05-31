@@ -413,13 +413,13 @@ func prepareTest(t *testing.T, initObjs ...client.Object) *RatioValidator {
 	uv := &RatioValidator{
 		DefaultNamespaceNodeSelectorAnnotation: defaultNodeSelectorAnnotation,
 
-		Client: failingClient{client},
+		Decoder: decoder,
+		Client:  failingClient{client},
 
 		Ratio: ratio.Fetcher{
 			Client: failingClient{client},
 		},
 	}
-	uv.InjectDecoder(decoder)
 	return uv
 }
 

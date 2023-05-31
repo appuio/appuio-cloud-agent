@@ -27,7 +27,7 @@ import (
 
 // NamespaceQuotaValidator checks namespaces for allowed node selectors.
 type NamespaceQuotaValidator struct {
-	decoder *admission.Decoder
+	Decoder *admission.Decoder
 
 	// Client is used to fetch namespace counts
 	Client client.Reader
@@ -64,7 +64,7 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 
 	// try to get the organization name from the namespace/projectrequest
 	var rawObject unstructured.Unstructured
-	if err := v.decoder.Decode(req, &rawObject); err != nil {
+	if err := v.Decoder.Decode(req, &rawObject); err != nil {
 		l.Error(err, "failed to decode request")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -130,10 +130,4 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 	}
 
 	return admission.Allowed("allowed")
-}
-
-// InjectDecoder injects a Admission request decoder
-func (v *NamespaceQuotaValidator) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
 }

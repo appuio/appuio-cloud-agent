@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	agentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
 	"github.com/appuio/appuio-cloud-agent/controllers"
@@ -179,8 +180,10 @@ func main() {
 
 	mgr.GetWebhookServer().Register("/validate-namespace-quota", &webhook.Admission{
 		Handler: &webhooks.NamespaceQuotaValidator{
-			Skipper: psk,
 			Client:  mgr.GetClient(),
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
+
+			Skipper: psk,
 
 			OrganizationLabel:                 conf.OrganizationLabel,
 			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,
@@ -220,8 +223,11 @@ func main() {
 func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, conf Config) {
 	mgr.GetWebhookServer().Register("/mutate-pod-node-selector", &webhook.Admission{
 		Handler: &webhooks.PodNodeSelectorMutator{
-			Skipper:                                skipper.StaticSkipper{ShouldSkip: false},
-			Client:                                 mgr.GetClient(),
+			Client:  mgr.GetClient(),
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
+
+			Skipper: skipper.StaticSkipper{ShouldSkip: false},
+
 			DefaultNodeSelector:                    conf.DefaultNodeSelector,
 			DefaultNamespaceNodeSelectorAnnotation: conf.DefaultNamespaceNodeSelectorAnnotation,
 		},
@@ -248,7 +254,9 @@ func registerRatioController(mgr ctrl.Manager, conf Config, orgLabel string) {
 			DefaultNodeSelector:                    conf.DefaultNodeSelector,
 			DefaultNamespaceNodeSelectorAnnotation: conf.DefaultNamespaceNodeSelectorAnnotation,
 
-			Client:      mgr.GetClient(),
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
+			Client:  mgr.GetClient(),
+
 			RatioLimits: conf.MemoryPerCoreLimits,
 			Ratio: &ratio.Fetcher{
 				Client: mgr.GetClient(),
