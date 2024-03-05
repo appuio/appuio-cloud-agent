@@ -16,6 +16,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -125,13 +126,17 @@ func main() {
 	lconf.QPS = float32(qps)
 	lconf.Burst = burst
 	mgr, err := ctrl.NewManager(lconf, ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     *metricsAddr,
-		Port:                   *webhookPort,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: *metricsAddr,
+		},
 		HealthProbeBindAddress: *probeAddr,
 		LeaderElection:         *enableLeaderElection,
 		LeaderElectionID:       "f2g2bc31.appuio-cloud-agent.appuio.io",
-		CertDir:                *webhookCertDir,
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    *webhookPort,
+			CertDir: *webhookCertDir,
+		}),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to setup manager")
