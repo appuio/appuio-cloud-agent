@@ -9,6 +9,7 @@ rules:
   - appuio.io
   resources:
   - usageprofiles
+  - users
   verbs:
   - get
   - list
