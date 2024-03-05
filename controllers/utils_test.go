@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	controlv1 "github.com/appuio/control-api/apis/v1"
+	userv1 "github.com/openshift/api/user/v1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +42,7 @@ func prepareClient(t *testing.T, initObjs ...client.Object) (client.WithWatch, *
 	require.NoError(t, clientgoscheme.AddToScheme(scheme))
 	require.NoError(t, cloudagentv1.AddToScheme(scheme))
 	require.NoError(t, controlv1.AddToScheme(scheme))
+	require.NoError(t, userv1.AddToScheme(scheme))
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
