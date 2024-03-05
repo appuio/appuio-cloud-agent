@@ -77,6 +77,10 @@ func main() {
 	flag.IntVar(&qps, "qps", 20, "QPS to use for the controller-runtime client")
 	flag.IntVar(&burst, "burst", 100, "Burst to use for the controller-runtime client")
 
+	var disableUserAttributeSync, disableUsageProfiles bool
+	flag.BoolVar(&disableUserAttributeSync, "disable-user-attribute-sync", false, "Disable the UserAttributeSync controller")
+	flag.BoolVar(&disableUsageProfiles, "disable-usage-profiles", false, "Disable the UsageProfile controllers")
+
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -146,42 +150,46 @@ func main() {
 	registerRatioController(mgr, conf, conf.OrganizationLabel)
 	registerOrganizationRBACController(mgr, conf.OrganizationLabel, conf.DefaultOrganizationClusterRoles)
 
-	if err := (&controllers.UserAttributeSyncReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("user-attribute-sync-controller"),
+	if !disableUserAttributeSync {
+		if err := (&controllers.UserAttributeSyncReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("user-attribute-sync-controller"),
 
-		ForeignClient: controlAPICluster.GetClient(),
-	}).SetupWithManagerAndForeignCluster(mgr, controlAPICluster); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "UserAttributeSync")
-		os.Exit(1)
+			ForeignClient: controlAPICluster.GetClient(),
+		}).SetupWithManagerAndForeignCluster(mgr, controlAPICluster); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "UserAttributeSync")
+			os.Exit(1)
+		}
 	}
 
-	if err := (&controllers.ZoneUsageProfileSyncReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("usage-profile-sync-controller"),
+	if !disableUsageProfiles {
+		if err := (&controllers.ZoneUsageProfileSyncReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("usage-profile-sync-controller"),
 
-		ForeignClient: controlAPICluster.GetClient(),
-	}).SetupWithManagerAndForeignCluster(mgr, controlAPICluster); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ratio")
-		os.Exit(1)
-	}
-	if err := (&controllers.ZoneUsageProfileApplyReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("usage-profile-apply-controller"),
-		Cache:    mgr.GetCache(),
+			ForeignClient: controlAPICluster.GetClient(),
+		}).SetupWithManagerAndForeignCluster(mgr, controlAPICluster); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ratio")
+			os.Exit(1)
+		}
+		if err := (&controllers.ZoneUsageProfileApplyReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("usage-profile-apply-controller"),
+			Cache:    mgr.GetCache(),
 
-		OrganizationLabel: conf.OrganizationLabel,
-		Transformers: []transformers.Transformer{
-			transformers.NewResourceQuotaTransformer("resourcequota.appuio.io"),
-		},
+			OrganizationLabel: conf.OrganizationLabel,
+			Transformers: []transformers.Transformer{
+				transformers.NewResourceQuotaTransformer("resourcequota.appuio.io"),
+			},
 
-		SelectedProfile: selectedUsageProfile,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ratio")
-		os.Exit(1)
+			SelectedProfile: selectedUsageProfile,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ratio")
+			os.Exit(1)
+		}
 	}
 
 	psk := &skipper.PrivilegedUserSkipper{
