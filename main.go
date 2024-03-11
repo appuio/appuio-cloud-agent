@@ -70,6 +70,9 @@ func main() {
 	var controlAPIURL string
 	flag.StringVar(&controlAPIURL, "control-api-url", "", "URL of the control API. If set agent does not use `-kubeconfig-control-api`. Expects a bearer token in `CONTROL_API_BEARER_TOKEN` env var.")
 
+	var upstreamZoneIdentifier string
+	flag.StringVar(&upstreamZoneIdentifier, "upstream-zone-identifier", "", "Identifies the agent in the control API. Currently used for Team/OrganizationMembers finalizer. Must be set if the GroupSync controller is enabled.")
+
 	var selectedUsageProfile string
 	flag.StringVar(&selectedUsageProfile, "usage-profile", "", "UsageProfile to use. Applies all profiles if empty. Dynamic selection is not supported yet.")
 
@@ -77,8 +80,9 @@ func main() {
 	flag.IntVar(&qps, "qps", 20, "QPS to use for the controller-runtime client")
 	flag.IntVar(&burst, "burst", 100, "Burst to use for the controller-runtime client")
 
-	var disableUserAttributeSync, disableUsageProfiles bool
+	var disableUserAttributeSync, disableGroupSync, disableUsageProfiles bool
 	flag.BoolVar(&disableUserAttributeSync, "disable-user-attribute-sync", false, "Disable the UserAttributeSync controller")
+	flag.BoolVar(&disableGroupSync, "disable-group-sync", false, "Disable the GroupSync controller")
 	flag.BoolVar(&disableUsageProfiles, "disable-usage-profiles", false, "Disable the UsageProfile controllers")
 
 	opts := zap.Options{}
@@ -159,6 +163,24 @@ func main() {
 			ForeignClient: controlAPICluster.GetClient(),
 		}).SetupWithManagerAndForeignCluster(mgr, controlAPICluster); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "UserAttributeSync")
+			os.Exit(1)
+		}
+	}
+	if !disableGroupSync {
+		if upstreamZoneIdentifier == "" {
+			setupLog.Error(err, "upstream-zone-identifier must be set if GroupSync controller is enabled")
+			os.Exit(1)
+		}
+		if err := (&controllers.GroupSyncReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("group-sync-controller"),
+
+			ForeignClient: controlAPICluster.GetClient(),
+
+			ControlAPIFinalizerZoneName: upstreamZoneIdentifier,
+		}).SetupWithManagerAndForeignCluster(mgr, controlAPICluster); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "GroupSync")
 			os.Exit(1)
 		}
 	}
