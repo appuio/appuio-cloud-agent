@@ -10,7 +10,19 @@ rules:
   resources:
   - usageprofiles
   - users
+  - teams
+  - organizationmembers
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - appuio.io
+  resources:
+  - teams
+  - teams/finalizers
+  - organizationmembers
+  - organizationmembers/finalizers
+  verbs:
+  - update
+  - patch
