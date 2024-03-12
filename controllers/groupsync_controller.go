@@ -40,7 +40,7 @@ const OrganizationMembersManifestName = "members"
 
 const UpstreamFinalizerPrefix = "agent.appuio.io/group-zone-"
 
-//+kubebuilder:rbac:groups=group.openshift.io,resources=users,verbs=get;list;watch;update;patch;create;delete
+//+kubebuilder:rbac:groups=user.openshift.io,resources=groups,verbs=get;list;watch;update;patch;create;delete
 
 // Reconcile syncs the Group with the upstream OrganizationMembers or Team resource from the foreign (Control-API) cluster.
 func (r *GroupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
