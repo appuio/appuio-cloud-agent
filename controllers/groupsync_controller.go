@@ -47,6 +47,8 @@ func (r *GroupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	l := log.FromContext(ctx)
 	l.Info("Reconciling Group")
 
+	finalizerName := UpstreamFinalizerPrefix + r.ControlAPIFinalizerZoneName
+
 	var members []controlv1.UserRef
 	var upstream client.Object
 
@@ -90,12 +92,16 @@ func (r *GroupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return ctrl.Result{}, err
 		}
 
-		if controllerutil.RemoveFinalizer(upstream, UpstreamFinalizerPrefix+r.ControlAPIFinalizerZoneName) {
+		l.Info("Group deleted")
+
+		if controllerutil.RemoveFinalizer(upstream, finalizerName) {
 			if err := r.ForeignClient.Update(ctx, upstream); err != nil {
 				l.Error(err, "unable to remove finalizer from upstream")
 				return ctrl.Result{}, err
 			}
 		}
+
+		l.Info("Finalizer removed from upstream", "finalizer", finalizerName)
 
 		return ctrl.Result{}, nil
 	}
@@ -112,12 +118,14 @@ func (r *GroupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		l.Error(err, "unable to create or update (%q) Group", op)
 		return ctrl.Result{}, err
 	}
+	l.Info("Group reconciled", "operation", op)
 
-	if controllerutil.AddFinalizer(upstream, UpstreamFinalizerPrefix+r.ControlAPIFinalizerZoneName) {
+	if controllerutil.AddFinalizer(upstream, finalizerName) {
 		if err := r.ForeignClient.Update(ctx, upstream); err != nil {
 			l.Error(err, "unable to add finalizer to upstream")
 			return ctrl.Result{}, err
 		}
+		l.Info("Finalizer added to upstream", "finalizer", finalizerName)
 	}
 
 	return ctrl.Result{}, nil
