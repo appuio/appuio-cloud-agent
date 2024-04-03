@@ -1,6 +1,6 @@
 module github.com/appuio/appuio-cloud-agent
 
-go 1.22.1
+go 1.22.2
 
 require (
 	github.com/appuio/control-api v0.33.0
