@@ -229,10 +229,9 @@ func main() {
 			Client:  mgr.GetClient(),
 			Decoder: admission.NewDecoder(mgr.GetScheme()),
 
-			Skipper: skipper.NewMultiSkipper(
-				skipper.StaticSkipper{ShouldSkip: disableUsageProfiles},
-				psk,
-			),
+			Skipper: psk,
+
+			SkipValidateQuota: disableUsageProfiles,
 
 			OrganizationLabel:                 conf.OrganizationLabel,
 			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,

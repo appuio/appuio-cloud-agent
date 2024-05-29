@@ -25,7 +25,9 @@ import (
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups=user.openshift.io,resources=users,verbs=get;list;watch
 
-// NamespaceQuotaValidator checks namespaces for allowed node selectors.
+// NamespaceQuotaValidator checks if a user is allowed to create a namespace.
+// The user or the namespace must have a label with the organization name.
+// The organization name is used to count the number of namespaces for the organization.
 type NamespaceQuotaValidator struct {
 	Decoder *admission.Decoder
 
@@ -33,6 +35,10 @@ type NamespaceQuotaValidator struct {
 	Client client.Reader
 
 	Skipper skipper.Skipper
+
+	// SkipValidateQuota allows skipping the quota validation.
+	// If the validation is skipped only the organization label is checked.
+	SkipValidateQuota bool
 
 	OrganizationLabel                 string
 	UserDefaultOrganizationAnnotation string
@@ -87,6 +93,11 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 		}
 		organizationName = don
 		l.Info("got default organization from user", "user", req.UserInfo.Username, "organization", organizationName)
+	}
+
+	if v.SkipValidateQuota {
+		l.V(1).Info("allowed: skipped quota validation")
+		return admission.Allowed("skipped quota validation")
 	}
 
 	if v.SelectedProfile == "" {

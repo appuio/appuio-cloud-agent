@@ -23,10 +23,11 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 	const nsLimit = 2
 
 	tests := map[string]struct {
-		initObjects  []client.Object
-		object       client.Object
-		allowed      bool
-		matchMessage string
+		initObjects         []client.Object
+		object              client.Object
+		allowed             bool
+		skipQuotaValidation bool
+		matchMessage        string
 	}{
 		"Allow Namespace": {
 			initObjects: []client.Object{
@@ -158,6 +159,42 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 			},
 			allowed: false,
 		},
+
+		"SkipQuotaValidation Allow Namespace TooMany": {
+			initObjects: []client.Object{newNamespace("a", map[string]string{orgLabel: "testorg"}, nil), newNamespace("b", map[string]string{orgLabel: "testorg"}, nil)},
+			object: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Labels: map[string]string{
+						orgLabel: "testorg",
+					},
+				},
+			},
+			skipQuotaValidation: true,
+			allowed:             true,
+		},
+		"SkipQuotaValidation Allow ProjectRequest TooMany": {
+			initObjects: []client.Object{newNamespace("a", map[string]string{orgLabel: "testorg"}, nil), newNamespace("b", map[string]string{orgLabel: "testorg"}, nil)},
+			object: &projectv1.ProjectRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Labels: map[string]string{
+						orgLabel: "testorg",
+					},
+				},
+			},
+			skipQuotaValidation: true,
+			allowed:             true,
+		},
+		"SkipQuotaValidation Deny NoOrganizationLabelAndNoUser": {
+			object: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+			},
+			skipQuotaValidation: true,
+			allowed:             false,
+		},
 	}
 
 	for name, test := range tests {
@@ -167,6 +204,8 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 				Decoder: dec,
 				Client:  c,
 				Skipper: skipper.StaticSkipper{ShouldSkip: false},
+
+				SkipValidateQuota: test.skipQuotaValidation,
 
 				OrganizationLabel:                 orgLabel,
 				UserDefaultOrganizationAnnotation: userDefaultOrgAnnotation,
