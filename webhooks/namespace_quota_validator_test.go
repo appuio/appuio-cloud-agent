@@ -48,13 +48,18 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 			initObjects: []client.Object{
 				newNamespace("a", map[string]string{orgLabel: "other"}, nil), newNamespace("b", map[string]string{orgLabel: "other"}, nil),
 				newNamespace("an", nil, nil), newNamespace("bn", nil, nil),
+				&userv1.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "user",
+						Annotations: map[string]string{
+							userDefaultOrgAnnotation: "testorg",
+						},
+					},
+				},
 			},
 			object: &projectv1.ProjectRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
-					Labels: map[string]string{
-						orgLabel: "testorg",
-					},
 				},
 			},
 			allowed: true,
@@ -99,7 +104,37 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 			matchMessage: "You cannot create more than 2 namespaces for organization \"testorg\"",
 		},
 		"Deny ProjectRequest TooMany": {
-			initObjects: []client.Object{newNamespace("a", map[string]string{orgLabel: "testorg"}, nil), newNamespace("b", map[string]string{orgLabel: "testorg"}, nil)},
+			initObjects: []client.Object{
+				newNamespace("a", map[string]string{orgLabel: "testorg"}, nil),
+				newNamespace("b", map[string]string{orgLabel: "testorg"}, nil),
+				&userv1.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "user",
+						Annotations: map[string]string{
+							userDefaultOrgAnnotation: "testorg",
+						},
+					},
+				},
+			},
+			object: &projectv1.ProjectRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+			},
+			allowed:      false,
+			matchMessage: "You cannot create more than 2 namespaces for organization \"testorg\"",
+		},
+		"Deny ProjectRequest NoDefaultOrg. ProjectRequests labels are ignored by OCP": {
+			initObjects: []client.Object{
+				&userv1.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "user",
+						Annotations: map[string]string{
+							userDefaultOrgAnnotation: "",
+						},
+					},
+				},
+			},
 			object: &projectv1.ProjectRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
@@ -109,7 +144,7 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 				},
 			},
 			allowed:      false,
-			matchMessage: "You cannot create more than 2 namespaces for organization \"testorg\"",
+			matchMessage: "There is no organization label and the user has no default organization set.",
 		},
 
 		"Deny Namespace TooMany GetOrganizationFromUser": {
@@ -174,7 +209,34 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 			allowed:             true,
 		},
 		"SkipQuotaValidation Allow ProjectRequest TooMany": {
-			initObjects: []client.Object{newNamespace("a", map[string]string{orgLabel: "testorg"}, nil), newNamespace("b", map[string]string{orgLabel: "testorg"}, nil)},
+			initObjects: []client.Object{
+				newNamespace("a", map[string]string{orgLabel: "testorg"}, nil),
+				newNamespace("b", map[string]string{orgLabel: "testorg"}, nil),
+				&userv1.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "user",
+						Annotations: map[string]string{
+							userDefaultOrgAnnotation: "testorg",
+						},
+					},
+				},
+			},
+			object: &projectv1.ProjectRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+			},
+			skipQuotaValidation: true,
+			allowed:             true,
+		},
+		"SkipQuotaValidation Name Deny NoDefaultOrgForUser": {
+			initObjects: []client.Object{
+				&userv1.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "user",
+					},
+				},
+			},
 			object: &projectv1.ProjectRequest{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
@@ -184,9 +246,10 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 				},
 			},
 			skipQuotaValidation: true,
-			allowed:             true,
+			allowed:             false,
+			matchMessage:        "There is no organization label and the user has no default organization set.",
 		},
-		"SkipQuotaValidation Deny NoOrganizationLabelAndNoUser": {
+		"SkipQuotaValidation Name Deny NoOrganizationLabelAndNoUser": {
 			object: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
