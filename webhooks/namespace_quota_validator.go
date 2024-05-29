@@ -68,16 +68,22 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 		return admission.Allowed("skipped")
 	}
 
-	// try to get the organization name from the namespace/projectrequest
 	var rawObject unstructured.Unstructured
 	if err := v.Decoder.Decode(req, &rawObject); err != nil {
 		l.Error(err, "failed to decode request")
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	organizationName, _, err := unstructured.NestedString(rawObject.Object, "metadata", "labels", v.OrganizationLabel)
-	if err != nil {
-		l.Error(err, "error while fetching organization label")
-		return admission.Errored(http.StatusInternalServerError, err)
+
+	// try to get the organization name from a namespace object.
+	// Note: ProjectRequest labels are ignored by the API server so only the user default organization can be used.
+	var organizationName string
+	if rawObject.GetKind() == "Namespace" {
+		on, _, err := unstructured.NestedString(rawObject.Object, "metadata", "labels", v.OrganizationLabel)
+		if err != nil {
+			l.Error(err, "error while fetching organization label")
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		organizationName = on
 	}
 
 	// get the organization name from the user if it is not set on the namespace/projectrequest
