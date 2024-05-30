@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,8 +51,9 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 		fail   bool
 		events int
 
-		namespace string
-		nsLabels  map[string]string
+		namespace  string
+		nsLabels   map[string]string
+		nsDeleting bool
 
 		roleBindings []rb
 		expected     []rb
@@ -80,6 +82,14 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 			nsLabels: map[string]string{
 				"appuio.io/no-rbac-creation": "true",
 				orgLabel:                     "foo",
+			},
+		},
+		"NamespaceInDeletion_Noop": {
+			clusterRoles: defaultCRs,
+			namespace:    "buzz",
+			nsDeleting:   true,
+			nsLabels: map[string]string{
+				orgLabel: "foo",
 			},
 		},
 		"NoRbacCreationFalseOrgNs_CreateRole": {
@@ -282,12 +292,18 @@ func TestOrganizationRBACReconciler(t *testing.T) {
 	for name, tc := range tcs {
 
 		obj := []client.Object{}
-		obj = append(obj, &corev1.Namespace{
+		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   tc.namespace,
 				Labels: tc.nsLabels,
 			},
-		})
+		}
+		if tc.nsDeleting {
+			t := metav1.NewTime(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
+			ns.DeletionTimestamp = &t
+			ns.Finalizers = append(ns.Finalizers, "test.appuio.io")
+		}
+		obj = append(obj, ns)
 
 		for _, rb := range tc.roleBindings {
 			subs := []rbacv1.Subject{}
