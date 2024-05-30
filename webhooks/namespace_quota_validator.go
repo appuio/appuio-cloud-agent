@@ -52,11 +52,17 @@ type NamespaceQuotaValidator struct {
 
 // Handle handles the admission requests
 func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
-	l := log.FromContext(ctx).
+	ctx = log.IntoContext(ctx, log.FromContext(ctx).
 		WithName("webhook.validate-namespace-quota.appuio.io").
 		WithValues("id", req.UID, "user", req.UserInfo.Username).
 		WithValues("namespace", req.Namespace, "name", req.Name,
-			"group", req.Kind.Group, "version", req.Kind.Version, "kind", req.Kind.Kind)
+			"group", req.Kind.Group, "version", req.Kind.Version, "kind", req.Kind.Kind))
+
+	return logAdmissionResponse(ctx, v.handle(ctx, req))
+}
+
+func (v *NamespaceQuotaValidator) handle(ctx context.Context, req admission.Request) admission.Response {
+	l := log.FromContext(ctx)
 
 	skip, err := v.Skipper.Skip(ctx, req)
 	if err != nil {
@@ -64,7 +70,6 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	if skip {
-		l.V(1).Info("allowed: skipped")
 		return admission.Allowed("skipped")
 	}
 
@@ -102,7 +107,6 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 	}
 
 	if v.SkipValidateQuota {
-		l.V(1).Info("allowed: skipped quota validation")
 		return admission.Allowed("skipped quota validation")
 	}
 
@@ -140,11 +144,28 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	if len(nsList.Items) >= nsCountLimit {
-		l.V(1).Info("denied: namespace count limit reached", "limit", nsCountLimit, "count", len(nsList.Items))
 		return admission.Denied(fmt.Sprintf(
 			"You cannot create more than %d namespaces for organization %q. Please contact support to have your quota raised.",
 			nsCountLimit, organizationName))
 	}
 
 	return admission.Allowed("allowed")
+}
+
+// logAdmissionResponse logs the admission response to the logger derived from the given context and returns it unchanged.
+func logAdmissionResponse(ctx context.Context, res admission.Response) admission.Response {
+	l := log.FromContext(ctx)
+
+	rmsg := "<not given>"
+	if res.Result != nil {
+		rmsg = res.Result.Message
+	}
+	msg := "denied"
+	if res.Allowed {
+		msg = "allowed"
+	}
+
+	l.Info(msg, "admission_message", rmsg)
+
+	return res
 }

@@ -5,19 +5,22 @@ import (
 	"testing"
 
 	controlv1 "github.com/appuio/control-api/apis/v1"
+	"github.com/go-logr/logr/testr"
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
 	"github.com/appuio/appuio-cloud-agent/skipper"
 )
 
 func TestNamespaceQuotaValidator_Handle(t *testing.T) {
-	ctx := context.Background()
+	ctx := log.IntoContext(context.Background(), testr.New(t))
+
 	const orgLabel = "test.io/organization"
 	const userDefaultOrgAnnotation = "test.io/default-organization"
 	const nsLimit = 2
