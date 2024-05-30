@@ -55,6 +55,11 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if ns.DeletionTimestamp != nil {
+		l.Info("namespace is being deleted, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+
 	org := r.getOrganization(ns)
 	if org == "" {
 		return ctrl.Result{}, nil
