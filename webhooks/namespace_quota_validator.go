@@ -152,7 +152,7 @@ func (v *NamespaceQuotaValidator) handle(ctx context.Context, req admission.Requ
 	return admission.Allowed("allowed")
 }
 
-// logAdmissionResponse logs the admission response to the given logger and returns it unchanged.
+// logAdmissionResponse logs the admission response to the logger derived from the given context and returns it unchanged.
 func logAdmissionResponse(ctx context.Context, res admission.Response) admission.Response {
 	l := log.FromContext(ctx)
 
