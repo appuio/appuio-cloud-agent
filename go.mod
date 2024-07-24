@@ -3,7 +3,7 @@ module github.com/appuio/appuio-cloud-agent
 go 1.22.1
 
 require (
-	github.com/appuio/control-api v0.33.2
+	github.com/appuio/control-api v0.33.3
 	github.com/go-logr/logr v1.4.2
 	github.com/minio/pkg v1.7.5
 	github.com/openshift/api v0.0.0-20240301093301-ce10821dc999 // release-4.11
