@@ -20,7 +20,7 @@ import (
 
 // PodNodeSelectorMutator checks namespaces for allowed node selectors.
 type PodNodeSelectorMutator struct {
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 
 	// Client is used to fetch namespace metadata
 	Client client.Reader

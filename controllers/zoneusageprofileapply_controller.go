@@ -173,7 +173,7 @@ func (r *ZoneUsageProfileApplyReconciler) ensureWatch(ctx context.Context, gvk s
 		toWatch := &unstructured.Unstructured{}
 		toWatch.SetGroupVersionKind(gvk)
 
-		err = r.controller.Watch(source.Kind(r.Cache, toWatch), handler.EnqueueRequestForOwner(r.Scheme, r.Client.RESTMapper(), &cloudagentv1.ZoneUsageProfile{}))
+		err = r.controller.Watch(source.Kind[client.Object](r.Cache, toWatch, handler.EnqueueRequestForOwner(r.Scheme, r.Client.RESTMapper(), &cloudagentv1.ZoneUsageProfile{})))
 	})
 	return err
 }

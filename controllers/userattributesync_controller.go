@@ -12,10 +12,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/appuio/appuio-cloud-agent/controllers/clustersource"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // UserAttributeSyncReconciler reconciles a User object
@@ -89,9 +89,9 @@ func (r *UserAttributeSyncReconciler) Reconcile(ctx context.Context, req ctrl.Re
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *UserAttributeSyncReconciler) SetupWithManagerAndForeignCluster(mgr ctrl.Manager, foreign clustersource.ClusterSource) error {
+func (r *UserAttributeSyncReconciler) SetupWithManagerAndForeignCluster(mgr ctrl.Manager, foreign cluster.Cluster) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&userv1.User{}).
-		WatchesRawSource(foreign.SourceFor(&controlv1.User{}), &handler.EnqueueRequestForObject{}).
+		WatchesRawSource(source.Kind(foreign.GetCache(), &controlv1.User{}, &handler.TypedEnqueueRequestForObject[*controlv1.User]{})).
 		Complete(r)
 }

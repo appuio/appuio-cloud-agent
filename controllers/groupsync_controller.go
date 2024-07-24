@@ -15,12 +15,12 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/appuio/appuio-cloud-agent/controllers/clustersource"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // GroupSyncReconciler reconciles a Group object
@@ -132,23 +132,17 @@ func (r *GroupSyncReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *GroupSyncReconciler) SetupWithManagerAndForeignCluster(mgr ctrl.Manager, foreign clustersource.ClusterSource) error {
+func (r *GroupSyncReconciler) SetupWithManagerAndForeignCluster(mgr ctrl.Manager, foreign cluster.Cluster) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&userv1.Group{}).
-		WatchesRawSource(foreign.SourceFor(&controlv1.Team{}), handler.EnqueueRequestsFromMapFunc(teamMapper)).
-		WatchesRawSource(foreign.SourceFor(&controlv1.OrganizationMembers{}), handler.EnqueueRequestsFromMapFunc(organizationMembersMapper)).
+		WatchesRawSource(source.Kind(foreign.GetCache(), &controlv1.Team{}, handler.TypedEnqueueRequestsFromMapFunc(teamMapper))).
+		WatchesRawSource(source.Kind(foreign.GetCache(), &controlv1.OrganizationMembers{}, handler.TypedEnqueueRequestsFromMapFunc(organizationMembersMapper))).
 		Complete(r)
 }
 
 // teamMapper maps the combination of namespace and name of the manifest as the group name to reconcile.
 // The namespace is the organization for the teams.
-func teamMapper(ctx context.Context, o client.Object) []reconcile.Request {
-	team, ok := o.(*controlv1.Team)
-	if !ok {
-		log.FromContext(ctx).Error(nil, "expected a Team object got a %T", o)
-		return []reconcile.Request{}
-	}
-
+func teamMapper(ctx context.Context, team *controlv1.Team) []reconcile.Request {
 	return []reconcile.Request{
 		{NamespacedName: types.NamespacedName{Name: fmt.Sprintf("%s+%s", team.Namespace, team.Name)}},
 	}
@@ -156,13 +150,7 @@ func teamMapper(ctx context.Context, o client.Object) []reconcile.Request {
 
 // organizationMembersMapper maps the namespace of the manifest as the group name to reconcile.
 // The name is static and the organization is in the namespace field.
-func organizationMembersMapper(ctx context.Context, o client.Object) []reconcile.Request {
-	member, ok := o.(*controlv1.OrganizationMembers)
-	if !ok {
-		log.FromContext(ctx).Error(nil, "expected a OrganizationMembers object got a %T", o)
-		return []reconcile.Request{}
-	}
-
+func organizationMembersMapper(ctx context.Context, member *controlv1.OrganizationMembers) []reconcile.Request {
 	return []reconcile.Request{
 		{NamespacedName: types.NamespacedName{Name: member.Namespace}},
 	}

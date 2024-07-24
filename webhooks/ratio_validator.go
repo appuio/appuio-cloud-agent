@@ -27,7 +27,7 @@ import (
 
 // RatioValidator checks for every action in a namespace whether the Memory to CPU ratio limit is exceeded and will return a warning if it is.
 type RatioValidator struct {
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 	Client  client.Client
 
 	Ratio       ratioFetcher

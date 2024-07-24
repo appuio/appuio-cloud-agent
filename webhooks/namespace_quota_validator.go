@@ -29,7 +29,7 @@ import (
 // The user or the namespace must have a label with the organization name.
 // The organization name is used to count the number of namespaces for the organization.
 type NamespaceQuotaValidator struct {
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 
 	// Client is used to fetch namespace counts
 	Client client.Reader
