@@ -9,12 +9,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	cloudagentv1 "github.com/appuio/appuio-cloud-agent/api/v1"
-	"github.com/appuio/appuio-cloud-agent/controllers/clustersource"
 )
 
 // ZoneUsageProfileSyncReconciler reconciles a ZoneUsageProfile object
@@ -63,9 +64,9 @@ func (r *ZoneUsageProfileSyncReconciler) Reconcile(ctx context.Context, req ctrl
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ZoneUsageProfileSyncReconciler) SetupWithManagerAndForeignCluster(mgr ctrl.Manager, foreign clustersource.ClusterSource) error {
+func (r *ZoneUsageProfileSyncReconciler) SetupWithManagerAndForeignCluster(mgr ctrl.Manager, foreign cluster.Cluster) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cloudagentv1.ZoneUsageProfile{}).
-		WatchesRawSource(foreign.SourceFor(&controlv1.UsageProfile{}), &handler.EnqueueRequestForObject{}).
+		WatchesRawSource(source.Kind(foreign.GetCache(), &controlv1.UsageProfile{}, &handler.TypedEnqueueRequestForObject[*controlv1.UsageProfile]{})).
 		Complete(r)
 }

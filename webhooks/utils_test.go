@@ -68,7 +68,7 @@ func newNamespace(name string, labels, annotations map[string]string) *corev1.Na
 	}
 }
 
-func prepareClient(t *testing.T, initObjs ...client.Object) (client.WithWatch, *runtime.Scheme, *admission.Decoder) {
+func prepareClient(t *testing.T, initObjs ...client.Object) (client.WithWatch, *runtime.Scheme, admission.Decoder) {
 	t.Helper()
 
 	scheme := runtime.NewScheme()
