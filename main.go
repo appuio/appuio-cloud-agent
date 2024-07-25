@@ -77,6 +77,9 @@ func main() {
 	var selectedUsageProfile string
 	flag.StringVar(&selectedUsageProfile, "usage-profile", "", "UsageProfile to use. Applies all profiles if empty. Dynamic selection is not supported yet.")
 
+	var cloudscaleLoadbalancerValidationEnabled bool
+	flag.BoolVar(&cloudscaleLoadbalancerValidationEnabled, "cloudscale-loadbalancer-validation-enabled", false, "Enable Cloudscale Loadbalancer validation. Validates that the k8s.cloudscale.ch/loadbalancer-uuid annotation cannot be changed by unprivileged users.")
+
 	var qps, burst int
 	flag.IntVar(&qps, "qps", 20, "QPS to use for the controller-runtime client")
 	flag.IntVar(&burst, "burst", 100, "Burst to use for the controller-runtime client")
@@ -239,6 +242,16 @@ func main() {
 
 			SelectedProfile:        selectedUsageProfile,
 			QuotaOverrideNamespace: conf.QuotaOverrideNamespace,
+		},
+	})
+
+	mgr.GetWebhookServer().Register("/validate-service-cloudscale-lb", &webhook.Admission{
+		Handler: &webhooks.ServiceCloudscaleLBValidator{
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
+			Skipper: skipper.NewMultiSkipper(
+				skipper.StaticSkipper{ShouldSkip: !cloudscaleLoadbalancerValidationEnabled},
+				psk,
+			),
 		},
 	})
 

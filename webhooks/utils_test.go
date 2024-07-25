@@ -24,11 +24,25 @@ import (
 func admissionRequestForObject(t *testing.T, object client.Object, scheme *runtime.Scheme) admission.Request {
 	t.Helper()
 
+	return admissionRequestForObjectWithOldObject(t, object, nil, scheme)
+}
+
+func admissionRequestForObjectWithOldObject(t *testing.T, object, oldObject client.Object, scheme *runtime.Scheme) admission.Request {
+	t.Helper()
+
 	testutils.EnsureGroupVersionKind(t, scheme, object)
 	gvk := object.GetObjectKind().GroupVersionKind()
 
 	raw, err := json.Marshal(object)
 	require.NoError(t, err)
+
+	var oldRaw []byte
+	if oldObject != nil {
+		testutils.EnsureGroupVersionKind(t, scheme, oldObject)
+		r, err := json.Marshal(oldObject)
+		require.NoError(t, err)
+		oldRaw = r
+	}
 
 	return admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
@@ -50,6 +64,9 @@ func admissionRequestForObject(t *testing.T, object client.Object, scheme *runti
 			Object: runtime.RawExtension{
 				Raw: raw,
 			},
+			OldObject: runtime.RawExtension{
+				Raw: oldRaw,
+			},
 		},
 	}
 }
@@ -58,6 +75,20 @@ func newNamespace(name string, labels, annotations map[string]string) *corev1.Na
 	return &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+	}
+}
+
+func newService(name string, labels, annotations map[string]string) *corev1.Service {
+	return &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
