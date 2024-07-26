@@ -18,9 +18,7 @@ const (
 	CloudscaleLoadbalancerUUIDAnnotation = "k8s.cloudscale.ch/loadbalancer-uuid"
 )
 
-// ServiceCloudscaleLBValidator checks if a user is allowed to create a namespace.
-// The user or the namespace must have a label with the organization name.
-// The organization name is used to count the number of namespaces for the organization.
+// ServiceCloudscaleLBValidator denies changes to the k8s.cloudscale.ch/loadbalancer-uuid annotation.
 type ServiceCloudscaleLBValidator struct {
 	Decoder admission.Decoder
 
