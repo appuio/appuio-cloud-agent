@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/inf.v0"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -211,6 +212,8 @@ func TestRatio_ratio(t *testing.T) {
 		memory string
 		ratio  string
 
+		threshold *inf.Dec
+
 		smallerThan     string
 		largerOrEqualTo string
 	}{
@@ -252,6 +255,15 @@ func TestRatio_ratio(t *testing.T) {
 			memory: "801Mi",
 			ratio:  "401Mi",
 		},
+		{
+			cpu:    "1",
+			memory: "4Gi",
+			ratio:  "4Gi",
+
+			threshold:       inf.NewDec(95, 2),
+			largerOrEqualTo: "3.9Gi",
+			smallerThan:     "4.3Gi",
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(fmt.Sprintf("[%s/%s=%s]", tc.memory, tc.cpu, tc.ratio), func(t *testing.T) {
@@ -272,10 +284,10 @@ func TestRatio_ratio(t *testing.T) {
 				assert.Equalf(t, tc.ratio, r.String(), "should pretty print")
 			}
 			if tc.smallerThan != "" {
-				assert.Truef(t, r.Below(resource.MustParse(tc.smallerThan)), "should be smaller than %s", tc.smallerThan)
+				assert.Truef(t, r.Below(resource.MustParse(tc.smallerThan), tc.threshold), "should be smaller than %s", tc.smallerThan)
 			}
 			if tc.largerOrEqualTo != "" {
-				assert.Falsef(t, r.Below(resource.MustParse(tc.largerOrEqualTo)), "should not be smaller than %s", tc.largerOrEqualTo)
+				assert.Falsef(t, r.Below(resource.MustParse(tc.largerOrEqualTo), tc.threshold), "should not be smaller than %s", tc.largerOrEqualTo)
 			}
 		})
 	}
@@ -310,7 +322,7 @@ func FuzzRatio(f *testing.F) {
 			out := r.Warn(&lim, "")
 			assert.NotEmpty(t, out)
 
-			r.Below(lim)
+			r.Below(lim, nil)
 		})
 	})
 }

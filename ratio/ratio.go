@@ -92,8 +92,15 @@ func (r Ratio) Ratio() *resource.Quantity {
 
 // Below returns if the memory to CPU ratio of the recorded objects is below the given limit.
 // Always returns false if no CPU is requested.
-func (r Ratio) Below(limit resource.Quantity) bool {
-	return r.Ratio() != nil && r.Ratio().Cmp(limit) < 0
+// The limit is multiplied by the optional threshold before comparison.
+// If threshold is nil, it defaults to 1.
+// A threshold of 0.95 would mean that the function returns true if the ratio is below 95% of the limit.
+func (r Ratio) Below(limit resource.Quantity, threshold *inf.Dec) bool {
+	if threshold == nil {
+		threshold = inf.NewDec(1, 0)
+	}
+
+	return r.Ratio() != nil && r.Ratio().AsDec().Cmp(inf.NewDec(0, 0).Mul(limit.AsDec(), threshold)) < 0
 }
 
 // String implements Stringer to print ratio

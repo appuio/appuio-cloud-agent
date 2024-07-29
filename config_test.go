@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/inf.v0"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -79,6 +80,36 @@ func Test_Config_MemoryPerCoreLimits(t *testing.T) {
 
 			assert.Equal(t, tC.limit, c.MemoryPerCoreLimits[0].Limit.String())
 			assert.Equal(t, tC.nodeSelector, c.MemoryPerCoreLimits[0].NodeSelector)
+		})
+	}
+}
+
+func Test_Config_MemoryPerCoreWarnThreshold(t *testing.T) {
+	tc := []struct {
+		yaml     string
+		expected *inf.Dec
+	}{
+		{
+			yaml:     `MemoryPerCoreWarnThreshold: "0.95"`,
+			expected: inf.NewDec(95, 2),
+		}, {
+			expected: nil,
+		},
+	}
+
+	for _, tC := range tc {
+		t.Run(tC.yaml, func(t *testing.T) {
+			t.Parallel()
+
+			tmp := t.TempDir()
+			configPath := filepath.Join(tmp, "config.yaml")
+			require.NoError(t, os.WriteFile(configPath, []byte(tC.yaml), 0o644))
+
+			c, warnings, err := ConfigFromFile(configPath)
+			assert.Len(t, warnings, 0)
+			require.NoError(t, err)
+
+			assert.Equal(t, tC.expected, c.MemoryPerCoreWarnThreshold)
 		})
 	}
 }

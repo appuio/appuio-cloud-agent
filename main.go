@@ -323,6 +323,7 @@ func registerRatioController(mgr ctrl.Manager, conf Config, orgLabel string) {
 			Ratio: &ratio.Fetcher{
 				Client: mgr.GetClient(),
 			},
+			RatioWarnThreshold: conf.MemoryPerCoreWarnThreshold,
 		},
 	})
 
@@ -335,6 +336,7 @@ func registerRatioController(mgr ctrl.Manager, conf Config, orgLabel string) {
 			Client:            mgr.GetClient(),
 			OrganizationLabel: orgLabel,
 		},
+		RatioWarnThreshold: conf.MemoryPerCoreWarnThreshold,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ratio")
 		os.Exit(1)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/appuio/appuio-cloud-agent/limits"
 	"github.com/appuio/appuio-cloud-agent/ratio"
+	"gopkg.in/inf.v0"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 
@@ -24,8 +25,9 @@ type RatioReconciler struct {
 	Recorder record.EventRecorder
 	Scheme   *runtime.Scheme
 
-	Ratio       ratioFetcher
-	RatioLimits limits.Limits
+	Ratio              ratioFetcher
+	RatioLimits        limits.Limits
+	RatioWarnThreshold *inf.Dec
 }
 
 type ratioFetcher interface {
@@ -62,7 +64,7 @@ func (r *RatioReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			continue
 		}
 
-		if ratio.Below(*limit) {
+		if ratio.Below(*limit, r.RatioWarnThreshold) {
 			l.Info("recording warn event: ratio too low")
 
 			if err := r.warnPod(ctx, req.Name, req.Namespace, ratio, nodeSel, limit); err != nil {
