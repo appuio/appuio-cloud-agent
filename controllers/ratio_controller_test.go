@@ -8,6 +8,7 @@ import (
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/inf.v0"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +44,28 @@ func TestRatioReconciler_Warn(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	require.Len(t, recorder.Events, 2)
+}
+
+func TestRatioReconciler_Threshold_Ok(t *testing.T) {
+	recorder := record.NewFakeRecorder(4)
+	_, err := prepareRatioTest(t, testRatioCfg{
+		limit:       resource.MustParse("4G"),
+		fetchMemory: resource.MustParse("4G"),
+		fetchCPU:    resource.MustParse("1100m"),
+		recorder:    recorder,
+		threshold:   inf.NewDec(90, 2),
+		obj: []client.Object{
+			testNs,
+			testPod,
+		},
+	}).Reconcile(context.TODO(), ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: testNs.Name,
+			Name:      testPod.Name,
+		},
+	})
+	assert.NoError(t, err)
+	requireNEvents(t, recorder, 0)
 }
 
 func TestRatioReconciler_Ok(t *testing.T) {
@@ -129,11 +152,17 @@ func TestRatioReconciler_RecordFailed(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	if !assert.Len(t, recorder.Events, 0) {
+	requireNEvents(t, recorder, 0)
+}
+
+func requireNEvents(t *testing.T, recorder *record.FakeRecorder, n int) {
+	t.Helper()
+
+	if !assert.Len(t, recorder.Events, n) {
 		for i := 0; i < len(recorder.Events); i++ {
-			e := <-recorder.Events
-			t.Log(e)
+			t.Log("Recorded event: ", <-recorder.Events)
 		}
+		t.FailNow()
 	}
 }
 
@@ -142,6 +171,7 @@ type testRatioCfg struct {
 	fetchErr    error
 	fetchCPU    resource.Quantity
 	fetchMemory resource.Quantity
+	threshold   *inf.Dec
 	obj         []client.Object
 	recorder    record.EventRecorder
 }
@@ -175,6 +205,7 @@ func prepareRatioTest(t *testing.T, cfg testRatioCfg) *RatioReconciler {
 				Limit: &cfg.limit,
 			},
 		},
+		RatioWarnThreshold: cfg.threshold,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"gopkg.in/inf.v0"
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,8 +31,9 @@ type RatioValidator struct {
 	Decoder admission.Decoder
 	Client  client.Client
 
-	Ratio       ratioFetcher
-	RatioLimits limits.Limits
+	Ratio              ratioFetcher
+	RatioLimits        limits.Limits
+	RatioWarnThreshold *inf.Dec
 
 	// DefaultNodeSelector is the default node selector to apply to pods
 	DefaultNodeSelector map[string]string
@@ -117,7 +119,7 @@ func (v *RatioValidator) Handle(ctx context.Context, req admission.Request) admi
 			continue
 		}
 
-		if r.Below(*limit) {
+		if r.Below(*limit, v.RatioWarnThreshold) {
 			l.Info("ratio too low", "node_selector", nodeSel, "ratio", r)
 			warnings = append(warnings, r.Warn(limit, nodeSel))
 		}

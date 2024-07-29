@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"gopkg.in/inf.v0"
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -41,6 +42,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 		mangleObject bool
 		create       bool
 		limits       limits.Limits
+		threshold    *inf.Dec
 		warn         bool
 		fail         bool
 		statusCode   int32
@@ -303,6 +305,24 @@ func TestRatioValidator_Handle(t *testing.T) {
 			fail:         true,
 			statusCode:   http.StatusBadRequest,
 		},
+		"Allow_UnfairNamespace_WithThreshold": {
+			user:      "appuio#foo",
+			namespace: "bar",
+			resources: []client.Object{
+				podFromResources("pod1", "foo", podResource{
+					{cpu: "1", memory: "4Gi"},
+				}),
+				podFromResources("pod2", "foo", podResource{
+					{cpu: "1", memory: "4Gi"},
+				}),
+				podFromResources("slightlyunfair", "bar", podResource{
+					{cpu: "1050m", memory: "4Gi"},
+				}),
+			},
+			limits:    limits.Limits{{Limit: requireParseQuantity(t, "4Gi")}},
+			warn:      false,
+			threshold: inf.NewDec(95, 2),
+		},
 	}
 
 	for name, tc := range tests {
@@ -312,6 +332,7 @@ func TestRatioValidator_Handle(t *testing.T) {
 
 			v := prepareTest(t, tc.resources...)
 			v.RatioLimits = tc.limits
+			v.RatioWarnThreshold = tc.threshold
 
 			ar := admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{

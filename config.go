@@ -6,6 +6,7 @@ import (
 
 	"github.com/appuio/appuio-cloud-agent/limits"
 	"go.uber.org/multierr"
+	"gopkg.in/inf.v0"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/yaml"
 )
@@ -27,6 +28,12 @@ type Config struct {
 	// MemoryPerCoreLimits is the fair use limit of memory usage per CPU core
 	// It is possible to select limits by node selector labels
 	MemoryPerCoreLimits limits.Limits
+	// MemoryPerCoreWarnThreshold is the threshold at which a warning is emitted if the memory per core limit is exceeded.
+	// Should be a decimal number resembling a percentage (e.g. "0.8" for 80%), represented as a string.
+	// The limit is multiplied by the optional threshold before comparison.
+	// A threshold of 0.95 would mean that the warnings are emitted if the ratio is below 95% of the limit.
+	// Thus adding a leniency of 5% to the limit.
+	MemoryPerCoreWarnThreshold *inf.Dec
 
 	// Privileged* is a list of the given type allowed to bypass restrictions.
 	// Wildcards are supported (e.g. "system:serviceaccount:default:*" or "cluster-*-operator").
