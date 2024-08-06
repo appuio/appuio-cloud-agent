@@ -5,7 +5,7 @@ go 1.22.5
 require (
 	github.com/appuio/control-api v0.33.3
 	github.com/go-logr/logr v1.4.2
-	github.com/minio/pkg v1.7.5
+	github.com/minio/pkg/v3 v3.0.10
 	github.com/openshift/api v0.0.0-20240301093301-ce10821dc999 // release-4.11
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
@@ -19,6 +19,8 @@ require (
 	sigs.k8s.io/kind v0.23.0
 	sigs.k8s.io/yaml v1.4.0
 )
+
+require github.com/minio/pkg v1.7.5
 
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
