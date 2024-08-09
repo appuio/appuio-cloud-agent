@@ -96,10 +96,8 @@ github.com/onsi/ginkgo/v2 v2.17.2 h1:7eMhcy3GimbsA3hEnVKdw/PQM9XN9krpKVXsZdph0/g
 github.com/onsi/ginkgo/v2 v2.17.2/go.mod h1:nP2DPOQoNsQmsVyv5rDA8JkXQoCs6goXIvr/PRJ1eCc=
 github.com/onsi/gomega v1.33.1 h1:dsYjIxxSR755MDmKVsaFQTE22ChNBcuuTWgkUDSubOk=
 github.com/onsi/gomega v1.33.1/go.mod h1:U4R44UsT+9eLIaYRB2a5qajjtQYn0hauxvRm16AVYg0=
-github.com/openshift/api v0.0.0-20240301093301-ce10821dc999 h1:+S998xHiJApsJZjRAO8wyedU9GfqFd8mtwWly6LqHDo=
-github.com/openshift/api v0.0.0-20240301093301-ce10821dc999/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
-github.com/openshift/api v0.0.0-20240723231418-442f06d7e03b h1:icnwDdM7J4V19lkSiWBTY4+6iadOpOn4jX868ST4Z+0=
-github.com/openshift/api v0.0.0-20240723231418-442f06d7e03b/go.mod h1:OOh6Qopf21pSzqNVCB5gomomBXb8o5sGKZxG2KNpaXM=
+github.com/openshift/api v0.0.0-20240809153734-7f2da4ccc272 h1:gm1H8A8FA+xSol0YtQ4nSZUN9/5q/4pAE5NF36tKh2E=
+github.com/openshift/api v0.0.0-20240809153734-7f2da4ccc272/go.mod h1:OOh6Qopf21pSzqNVCB5gomomBXb8o5sGKZxG2KNpaXM=
 github.com/pborman/uuid v1.2.1 h1:+ZZIw58t/ozdjRaXh/3awHfmWRbzYxJoAdNJxe/3pvw=
 github.com/pborman/uuid v1.2.1/go.mod h1:X/NO0urCmaxf9VXbdlT7C2Yzkj2IKimNn4k+gtPdI/k=
 github.com/pelletier/go-toml v1.9.5 h1:4yBQzkHv+7BHq2PQUZF3Mx0IYxG7LsP222s7Agd3ve8=
