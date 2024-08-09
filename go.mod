@@ -6,7 +6,7 @@ require (
 	github.com/appuio/control-api v0.33.3
 	github.com/go-logr/logr v1.4.2
 	github.com/minio/pkg v1.7.5
-	github.com/openshift/api v0.0.0-20240301093301-ce10821dc999 // release-4.11
+	github.com/openshift/api v0.0.0-20240809153734-7f2da4ccc272 // release-4.11
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0
