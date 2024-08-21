@@ -8,6 +8,8 @@ rules:
   - ""
   resources:
   - configmaps
+  - namespaces
+  - pods
   verbs:
   - get
   - list
@@ -22,25 +24,9 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - namespaces/finalizers
   verbs:
   - update
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - '*'
   resources:
