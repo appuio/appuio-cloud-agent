@@ -85,6 +85,20 @@ func newNamespace(name string, labels, annotations map[string]string) *corev1.Na
 	}
 }
 
+func newProjectRequest(name string, labels, annotations map[string]string) *projectv1.ProjectRequest {
+	return &projectv1.ProjectRequest{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Project",
+			APIVersion: "project.openshift.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+	}
+}
+
 func newService(name string, labels, annotations map[string]string) *corev1.Service {
 	return &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
