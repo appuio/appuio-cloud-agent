@@ -88,7 +88,7 @@ func (v *PodNodeSelectorMutator) Handle(ctx context.Context, req admission.Reque
 	if hasNodeSel {
 		for k, v := range defaults {
 			if _, exists := nodeSel[k]; !exists {
-				patches = append(patches, jsonpatch.NewOperation("add", "/spec/nodeSelector/"+escapeJSONPointer(k), v))
+				patches = append(patches, jsonpatch.NewOperation("add", "/spec/nodeSelector/"+escapeJSONPointerSegment(k), v))
 			}
 		}
 	} else {
@@ -117,6 +117,10 @@ func (v *PodNodeSelectorMutator) defaultLabels(ns corev1.Namespace) (labels.Set,
 	return d, nil
 }
 
-func escapeJSONPointer(s string) string {
+// escapeJSONPointerSegment escapes a JSON pointer segment.
+// It replaces `~“ with `~0` and `/“ with `~1`.
+// See https://tools.ietf.org/html/rfc6901#section-3.
+// example.com/label~test becomes example.com~1label~0test
+func escapeJSONPointerSegment(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, "~", "~0"), "/", "~1")
 }

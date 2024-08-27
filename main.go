@@ -80,6 +80,9 @@ func main() {
 	var cloudscaleLoadbalancerValidationEnabled bool
 	flag.BoolVar(&cloudscaleLoadbalancerValidationEnabled, "cloudscale-loadbalancer-validation-enabled", false, "Enable Cloudscale Loadbalancer validation. Validates that the k8s.cloudscale.ch/loadbalancer-uuid annotation cannot be changed by unprivileged users.")
 
+	var namespaceProjectOrganizationMutatorEnabled bool
+	flag.BoolVar(&namespaceProjectOrganizationMutatorEnabled, "namespace-project-organization-mutator-enabled", false, "Enable the NamespaceProjectOrganizationMutator webhook. Adds the organization label to namespace and project create requests.")
+
 	var qps, burst int
 	flag.IntVar(&qps, "qps", 20, "QPS to use for the controller-runtime client")
 	flag.IntVar(&burst, "burst", 100, "Burst to use for the controller-runtime client")
@@ -252,6 +255,21 @@ func main() {
 				skipper.StaticSkipper{ShouldSkip: !cloudscaleLoadbalancerValidationEnabled},
 				psk,
 			),
+		},
+	})
+
+	mgr.GetWebhookServer().Register("/mutate-namespace-project-organization", &webhook.Admission{
+		Handler: &webhooks.NamespaceProjectOrganizationMutator{
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
+			Client:  mgr.GetClient(),
+
+			Skipper: skipper.NewMultiSkipper(
+				skipper.StaticSkipper{ShouldSkip: false},
+				psk,
+			),
+
+			OrganizationLabel:                 conf.OrganizationLabel,
+			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,
 		},
 	})
 

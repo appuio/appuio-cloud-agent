@@ -25,6 +25,48 @@ webhooks:
         resources:
           - pods
     sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: system
+        path: /mutate-namespace-project-organization
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: namespace.namespace-project-organization-mutator.appuio.io
+    rules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - namespaces
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: system
+        path: /mutate-namespace-project-organization
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: project.namespace-project-organization-mutator.appuio.io
+    rules:
+      - apiGroups:
+          - project.openshift.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - projects
+    sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
