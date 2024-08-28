@@ -83,6 +83,9 @@ func main() {
 	var namespaceProjectOrganizationMutatorEnabled bool
 	flag.BoolVar(&namespaceProjectOrganizationMutatorEnabled, "namespace-project-organization-mutator-enabled", false, "Enable the NamespaceProjectOrganizationMutator webhook. Adds the organization label to namespace and project create requests.")
 
+	var namespaceMetadataValidatorEnabled bool
+	flag.BoolVar(&namespaceMetadataValidatorEnabled, "namespace-metadata-validator-enabled", false, "Enable the NamespaceMetadataValidator webhook. Validates the metadata of a namespace.")
+
 	var qps, burst int
 	flag.IntVar(&qps, "qps", 20, "QPS to use for the controller-runtime client")
 	flag.IntVar(&burst, "burst", 100, "Burst to use for the controller-runtime client")
@@ -264,12 +267,26 @@ func main() {
 			Client:  mgr.GetClient(),
 
 			Skipper: skipper.NewMultiSkipper(
-				skipper.StaticSkipper{ShouldSkip: false},
+				skipper.StaticSkipper{ShouldSkip: !namespaceProjectOrganizationMutatorEnabled},
 				psk,
 			),
 
 			OrganizationLabel:                 conf.OrganizationLabel,
 			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,
+		},
+	})
+
+	mgr.GetWebhookServer().Register("/validate-namespace-metadata", &webhook.Admission{
+		Handler: &webhooks.NamespaceMetadataValidator{
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
+			Skipper: skipper.NewMultiSkipper(
+				skipper.StaticSkipper{ShouldSkip: !namespaceMetadataValidatorEnabled},
+				psk,
+			),
+
+			ReservedNamespaces: conf.ReservedNamespaces,
+			AllowedAnnotations: conf.AllowedAnnotations,
+			AllowedLabels:      conf.AllowedLabels,
 		},
 	})
 

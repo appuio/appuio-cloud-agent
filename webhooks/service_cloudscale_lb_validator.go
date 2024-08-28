@@ -55,7 +55,7 @@ func (v *ServiceCloudscaleLBValidator) handle(ctx context.Context, req admission
 	}
 
 	var oldService corev1.Service
-	if req.OldObject.Raw != nil {
+	if len(req.OldObject.Raw) > 0 {
 		if err := v.Decoder.DecodeRaw(req.OldObject, &oldService); err != nil {
 			l.Error(err, "failed to decode old object")
 			return admission.Errored(http.StatusBadRequest, err)
