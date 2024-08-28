@@ -37,3 +37,13 @@ DefaultNodeSelector:
 # The keys are the name of default rolebindings to create and the values are the names of the clusterroles they bind to.
 DefaultOrganizationClusterRoles:
   admin: admin
+
+# ReservedNamespaces is a list of namespaces that are reserved and can't be created by users.
+# Supports '*' and '?' wildcards.
+ReservedNamespaces: [default, kube-*, openshift-*]
+# AllowedAnnotations is a list of annotations that are allowed on namespaces.
+# Supports '*' and '?' wildcards.
+AllowedAnnotations: [appuio.io/default-node-selector]
+# AllowedLabels is a list of labels that are allowed on namespaces.
+# Supports '*' and '?' wildcards.
+AllowedLabels: [appuio.io/organization]

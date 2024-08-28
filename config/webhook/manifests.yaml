@@ -79,6 +79,48 @@ webhooks:
       service:
         name: webhook-service
         namespace: system
+        path: /validate-namespace-metadata
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: validate-namespace-metadata-projectrequests.appuio.io
+    rules:
+      - apiGroups:
+          - project.openshift.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - projectrequests
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: system
+        path: /validate-namespace-metadata
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: validate-namespace-metadata.appuio.io
+    rules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - namespaces
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: system
         path: /validate-namespace-quota
     failurePolicy: Fail
     matchPolicy: Equivalent

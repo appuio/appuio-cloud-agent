@@ -53,6 +53,16 @@ type Config struct {
 	// DefaultOrganizationClusterRoles is a map containing the configuration for rolebindings that are created by default in each organization namespace.
 	// The keys are the name of default rolebindings to create and the values are the names of the clusterroles they bind to.
 	DefaultOrganizationClusterRoles map[string]string
+
+	// ReservedNamespaces is a list of namespaces that are reserved and can't be created by users.
+	// Supports '*' and '?' wildcards.
+	ReservedNamespaces []string
+	// AllowedAnnotations is a list of annotations that are allowed on namespaces.
+	// Supports '*' and '?' wildcards.
+	AllowedAnnotations []string
+	// AllowedLabels is a list of labels that are allowed on namespaces.
+	// Supports '*' and '?' wildcards.
+	AllowedLabels []string
 }
 
 func ConfigFromFile(path string) (c Config, warn []string, err error) {
