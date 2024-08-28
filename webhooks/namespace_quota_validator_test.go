@@ -31,6 +31,8 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 		allowed             bool
 		skipQuotaValidation bool
 		matchMessage        string
+		disableProfile      bool
+		legacyQuota         int
 	}{
 		"Allow Namespace": {
 			initObjects: []client.Object{
@@ -261,6 +263,67 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 			skipQuotaValidation: true,
 			allowed:             false,
 		},
+
+		"LegacyMode: Allow Namespace": {
+			initObjects: []client.Object{
+				newNamespace("a", map[string]string{orgLabel: "other"}, nil), newNamespace("b", map[string]string{orgLabel: "other"}, nil),
+				newNamespace("an", nil, nil), newNamespace("bn", nil, nil),
+			},
+			object: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Labels: map[string]string{
+						orgLabel: "testorg",
+					},
+				},
+			},
+			allowed:        true,
+			legacyQuota:    1,
+			disableProfile: true,
+		},
+		"LegacyMode: Deny Namespace TooMany": {
+			initObjects: []client.Object{
+				newNamespace("a", map[string]string{orgLabel: "testorg"}, nil),
+			},
+			object: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Labels: map[string]string{
+						orgLabel: "testorg",
+					},
+				},
+			},
+			allowed:        false,
+			legacyQuota:    1,
+			disableProfile: true,
+		},
+		"LegacyMode: Allow Namespace Override": {
+			initObjects: []client.Object{
+				newNamespace("a", map[string]string{orgLabel: "testorg"}, nil),
+				newNamespace("b", map[string]string{orgLabel: "testorg"}, nil),
+				newNamespace("c", map[string]string{orgLabel: "testorg"}, nil),
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "override-testorg",
+						Namespace: "test",
+					},
+					Data: map[string]string{
+						"namespaceQuota": "4",
+					},
+				},
+			},
+			object: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+					Labels: map[string]string{
+						orgLabel: "testorg",
+					},
+				},
+			},
+			allowed:        true,
+			legacyQuota:    1,
+			disableProfile: true,
+		},
 	}
 
 	for name, test := range tests {
@@ -278,6 +341,11 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 
 				SelectedProfile:        "test",
 				QuotaOverrideNamespace: "test",
+				LegacyNamespaceQuota:   test.legacyQuota,
+			}
+
+			if test.disableProfile {
+				subject.SelectedProfile = ""
 			}
 
 			require.NoError(t, c.Create(ctx, &cloudagentv1.ZoneUsageProfile{

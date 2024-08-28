@@ -63,6 +63,9 @@ type Config struct {
 	// AllowedLabels is a list of labels that are allowed on namespaces.
 	// Supports '*' and '?' wildcards.
 	AllowedLabels []string
+
+	// LegacyNamespaceQuota is the default quota for namespaces if no ZoneUsageProfile is selected.
+	LegacyNamespaceQuota int
 }
 
 func ConfigFromFile(path string) (c Config, warn []string, err error) {

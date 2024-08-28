@@ -248,6 +248,8 @@ func main() {
 
 			SelectedProfile:        selectedUsageProfile,
 			QuotaOverrideNamespace: conf.QuotaOverrideNamespace,
+
+			LegacyNamespaceQuota: conf.LegacyNamespaceQuota,
 		},
 	})
 
