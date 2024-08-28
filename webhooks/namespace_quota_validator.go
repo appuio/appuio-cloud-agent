@@ -44,10 +44,15 @@ type NamespaceQuotaValidator struct {
 	UserDefaultOrganizationAnnotation string
 
 	// SelectedProfile is the name of the ZoneUsageProfile to use for the quota
+	// An empty string means that the legacy namespace quota is used if set.
 	SelectedProfile string
 
 	// QuotaOverrideNamespace is the namespace in which the quota overrides are stored
 	QuotaOverrideNamespace string
+
+	// LegacyNamespaceQuota is the namespace quota for legacy mode.
+	// It is used if no ZoneUsageProfile is selected.
+	LegacyNamespaceQuota int
 }
 
 // Handle handles the admission requests
@@ -55,6 +60,7 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 	ctx = log.IntoContext(ctx, log.FromContext(ctx).
 		WithName("webhook.validate-namespace-quota.appuio.io").
 		WithValues("id", req.UID, "user", req.UserInfo.Username).
+		WithValues("legacyMode", v.legacyMode()).
 		WithValues("namespace", req.Namespace, "name", req.Name,
 			"group", req.Kind.Group, "version", req.Kind.Version, "kind", req.Kind.Kind))
 
@@ -110,16 +116,21 @@ func (v *NamespaceQuotaValidator) handle(ctx context.Context, req admission.Requ
 		return admission.Allowed("skipped quota validation")
 	}
 
-	if v.SelectedProfile == "" {
-		return admission.Denied("No ZoneUsageProfile selected")
-	}
+	var nsCountLimit int
+	if v.legacyMode() {
+		nsCountLimit = v.LegacyNamespaceQuota
+	} else {
+		if v.SelectedProfile == "" {
+			return admission.Denied("No ZoneUsageProfile selected")
+		}
 
-	var profile cloudagentv1.ZoneUsageProfile
-	if err := v.Client.Get(ctx, types.NamespacedName{Name: v.SelectedProfile}, &profile); err != nil {
-		l.Error(err, "error while fetching zone usage profile")
-		return admission.Errored(http.StatusInternalServerError, err)
+		var profile cloudagentv1.ZoneUsageProfile
+		if err := v.Client.Get(ctx, types.NamespacedName{Name: v.SelectedProfile}, &profile); err != nil {
+			l.Error(err, "error while fetching zone usage profile")
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		nsCountLimit = profile.Spec.UpstreamSpec.NamespaceCount
 	}
-	nsCountLimit := profile.Spec.UpstreamSpec.NamespaceCount
 
 	var overrideCM corev1.ConfigMap
 	if err := v.Client.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("override-%s", organizationName), Namespace: v.QuotaOverrideNamespace}, &overrideCM); err == nil {
@@ -150,6 +161,11 @@ func (v *NamespaceQuotaValidator) handle(ctx context.Context, req admission.Requ
 	}
 
 	return admission.Allowed("allowed")
+}
+
+// legacyMode returns true if the legacy namespace quota is set and no ZoneUsageProfile is selected.
+func (v *NamespaceQuotaValidator) legacyMode() bool {
+	return v.SelectedProfile == "" && v.LegacyNamespaceQuota > 0
 }
 
 // logAdmissionResponse logs the admission response to the logger derived from the given context and returns it unchanged.
