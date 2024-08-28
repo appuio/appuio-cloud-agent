@@ -187,6 +187,7 @@ func (r *ZoneUsageProfileApplyReconciler) SetupWithManager(mgr ctrl.Manager) err
 
 	c, err := ctrl.NewControllerManagedBy(mgr).
 		For(&cloudagentv1.ZoneUsageProfile{}).
+		Named("zoneusageprofiles_apply").
 		// Watch all namespaces and enqueue requests for all profiles on any change.
 		Watches(
 			&corev1.Namespace{},

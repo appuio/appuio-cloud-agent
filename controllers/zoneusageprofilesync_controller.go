@@ -67,6 +67,7 @@ func (r *ZoneUsageProfileSyncReconciler) Reconcile(ctx context.Context, req ctrl
 func (r *ZoneUsageProfileSyncReconciler) SetupWithManagerAndForeignCluster(mgr ctrl.Manager, foreign cluster.Cluster) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cloudagentv1.ZoneUsageProfile{}).
+		Named("zoneusageprofiles_sync").
 		WatchesRawSource(source.Kind(foreign.GetCache(), &controlv1.UsageProfile{}, &handler.TypedEnqueueRequestForObject[*controlv1.UsageProfile]{})).
 		Complete(r)
 }
