@@ -58,6 +58,7 @@ func (m *NamespaceProjectOrganizationMutator) Handle(ctx context.Context, req ad
 	ctx = log.IntoContext(ctx, log.FromContext(ctx).
 		WithName("webhook.namespace-project-organization-mutator.appuio.io").
 		WithValues("id", req.UID, "user", req.UserInfo.Username).
+		WithValues("operation", req.Operation).
 		WithValues("namespace", req.Namespace, "name", req.Name,
 			"group", req.Kind.Group, "version", req.Kind.Version, "kind", req.Kind.Kind))
 
@@ -69,7 +70,11 @@ func (m *NamespaceProjectOrganizationMutator) handle(ctx context.Context, req ad
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error while checking skipper: %w", err))
 	}
-	if skip {
+	if skip && req.Kind.Kind == "Project" {
+		// Project requests come from internal openshift components with annotations for user info.
+		// Do not allow them but check the annotations later in the code.
+		log.FromContext(ctx).Info("`Project` requests will not be skipped")
+	} else if skip {
 		return admission.Allowed("skipped")
 	}
 
