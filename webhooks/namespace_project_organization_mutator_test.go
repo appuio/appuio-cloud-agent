@@ -32,6 +32,8 @@ func Test_NamespaceProjectOrganizationMutator_Handle(t *testing.T) {
 
 		allowed  bool
 		orgPatch string
+
+		skip bool
 	}{
 		{
 			name: "Project: request with org label set",
@@ -108,6 +110,21 @@ func Test_NamespaceProjectOrganizationMutator_Handle(t *testing.T) {
 				}
 			},
 
+			user:    "user",
+			allowed: false,
+		},
+		{
+			name: "Project: project requests should not be skipped",
+
+			object: newProjectRequest("project", map[string]string{orgLabel: "other-org"}, nil),
+			additionalObjects: func(*testing.T) []client.Object {
+				return []client.Object{
+					newUser("user", ""),
+					newGroup("other-org"),
+				}
+			},
+
+			skip:    true,
 			user:    "user",
 			allowed: false,
 		},
@@ -358,7 +375,7 @@ func Test_NamespaceProjectOrganizationMutator_Handle(t *testing.T) {
 			subject := NamespaceProjectOrganizationMutator{
 				Decoder: decoder,
 				Client:  c,
-				Skipper: skipper.StaticSkipper{},
+				Skipper: skipper.StaticSkipper{ShouldSkip: tc.skip},
 
 				OrganizationLabel:                 orgLabel,
 				UserDefaultOrganizationAnnotation: testDefaultOrgAnnotation,
