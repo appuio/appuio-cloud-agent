@@ -100,6 +100,22 @@ func Test_NamespaceProjectOrganizationMutator_Handle(t *testing.T) {
 		},
 
 		{
+			name: "Namespace: user with default org, no org set on object but other labels exist",
+
+			object: newNamespace("project", map[string]string{"foo": "bar"}, nil),
+			additionalObjects: func(*testing.T) []client.Object {
+				return []client.Object{
+					newUser("user", "some-org"),
+					newGroup("some-org", "user"),
+				}
+			},
+
+			user:     "user",
+			allowed:  true,
+			orgPatch: "some-org",
+		},
+
+		{
 			name: "Project: request with org label set, user not in org",
 
 			object: newProjectRequest("project", map[string]string{orgLabel: "other-org"}, nil),
@@ -396,7 +412,7 @@ func Test_NamespaceProjectOrganizationMutator_Handle(t *testing.T) {
 			require.Equal(t, tc.allowed, resp.Allowed)
 
 			if tc.orgPatch != "" {
-				requireOrgPatch(t, tc.orgPatch, resp.Patches)
+				requireOrgPatch(t, tc.object, tc.orgPatch, resp.Patches)
 			} else {
 				require.Empty(t, resp.Patches)
 			}
@@ -404,9 +420,15 @@ func Test_NamespaceProjectOrganizationMutator_Handle(t *testing.T) {
 	}
 }
 
-func requireOrgPatch(t *testing.T, org string, ps []jsonpatch.Operation) {
+func requireOrgPatch(t *testing.T, origObject client.Object, org string, ps []jsonpatch.Operation) {
+	t.Helper()
+
 	require.Len(t, ps, 1)
-	require.Equal(t, jsonpatch.NewOperation("add", "/metadata/labels/example.com~1organization", org), ps[0])
+	if origObject.GetLabels() != nil {
+		require.Equal(t, jsonpatch.NewOperation("add", "/metadata/labels/example.com~1organization", org), ps[0])
+		return
+	}
+	require.Equal(t, jsonpatch.NewOperation("add", "/metadata/labels", map[string]string{"example.com/organization": org}), ps[0])
 }
 
 func newGroup(name string, users ...string) *userv1.Group {

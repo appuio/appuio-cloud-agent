@@ -137,7 +137,7 @@ func (m *NamespaceProjectOrganizationMutator) handleUserRequested(ctx context.Co
 	}
 
 	if defaultOrgAdded {
-		return admission.Patched("added default organization", m.orgLabelPatch(org))
+		return admission.Patched("added default organization", m.orgLabelPatch(rawObject, org))
 	}
 
 	return admission.Allowed("Requester is member of organization")
@@ -164,17 +164,26 @@ func (m *NamespaceProjectOrganizationMutator) handleServiceAccountNamespace(ctx 
 	}
 
 	if requestedOrg == "" {
-		return admission.Patched("added organization label", m.orgLabelPatch(nsOrg))
+		return admission.Patched("added organization label", m.orgLabelPatch(rawObject, nsOrg))
 	}
 
 	return admission.Allowed("service account may use the organization of its namespace")
 }
 
 // orgLabelPatch returns a JSON patch operation to add the `OrganizationLabel` with value `org` to an object.
-func (m *NamespaceProjectOrganizationMutator) orgLabelPatch(org string) jsonpatch.Operation {
+func (m *NamespaceProjectOrganizationMutator) orgLabelPatch(objToPatch unstructured.Unstructured, org string) jsonpatch.Operation {
+	_, exists, _ := unstructured.NestedStringMap(objToPatch.Object, "metadata", "labels")
+	if exists {
+		return jsonpatch.Operation{
+			Operation: "add",
+			Path:      "/" + strings.Join([]string{"metadata", "labels", escapeJSONPointerSegment(m.OrganizationLabel)}, "/"),
+			Value:     org,
+		}
+	}
+
 	return jsonpatch.Operation{
 		Operation: "add",
-		Path:      "/" + strings.Join([]string{"metadata", "labels", escapeJSONPointerSegment(m.OrganizationLabel)}, "/"),
-		Value:     org,
+		Path:      "/metadata/labels",
+		Value:     map[string]string{m.OrganizationLabel: org},
 	}
 }
