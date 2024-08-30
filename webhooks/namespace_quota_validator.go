@@ -50,6 +50,8 @@ type NamespaceQuotaValidator struct {
 	// QuotaOverrideNamespace is the namespace in which the quota overrides are stored
 	QuotaOverrideNamespace string
 
+	// EnableLegacyNamespaceQuota enables the legacy namespace quota.
+	EnableLegacyNamespaceQuota bool
 	// LegacyNamespaceQuota is the namespace quota for legacy mode.
 	// It is used if no ZoneUsageProfile is selected.
 	LegacyNamespaceQuota int
@@ -60,7 +62,7 @@ func (v *NamespaceQuotaValidator) Handle(ctx context.Context, req admission.Requ
 	ctx = log.IntoContext(ctx, log.FromContext(ctx).
 		WithName("webhook.validate-namespace-quota.appuio.io").
 		WithValues("id", req.UID, "user", req.UserInfo.Username).
-		WithValues("legacyMode", v.legacyMode()).
+		WithValues("legacyMode", v.LegacyNamespaceQuota).
 		WithValues("namespace", req.Namespace, "name", req.Name,
 			"group", req.Kind.Group, "version", req.Kind.Version, "kind", req.Kind.Kind))
 
@@ -117,7 +119,7 @@ func (v *NamespaceQuotaValidator) handle(ctx context.Context, req admission.Requ
 	}
 
 	var nsCountLimit int
-	if v.legacyMode() {
+	if v.EnableLegacyNamespaceQuota {
 		nsCountLimit = v.LegacyNamespaceQuota
 	} else {
 		if v.SelectedProfile == "" {
@@ -161,11 +163,6 @@ func (v *NamespaceQuotaValidator) handle(ctx context.Context, req admission.Requ
 	}
 
 	return admission.Allowed("allowed")
-}
-
-// legacyMode returns true if the legacy namespace quota is set and no ZoneUsageProfile is selected.
-func (v *NamespaceQuotaValidator) legacyMode() bool {
-	return v.SelectedProfile == "" && v.LegacyNamespaceQuota > 0
 }
 
 // logAdmissionResponse logs the admission response to the logger derived from the given context and returns it unchanged.
