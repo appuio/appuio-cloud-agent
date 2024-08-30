@@ -86,6 +86,9 @@ func main() {
 	var namespaceMetadataValidatorEnabled bool
 	flag.BoolVar(&namespaceMetadataValidatorEnabled, "namespace-metadata-validator-enabled", false, "Enable the NamespaceMetadataValidator webhook. Validates the metadata of a namespace.")
 
+	var legacyNamespaceQuotaEnabled bool
+	flag.BoolVar(&legacyNamespaceQuotaEnabled, "legacy-namespace-quota-enabled", false, "Enable the legacy namespace quota controller. This controller is deprecated and will be removed in the future.")
+
 	var qps, burst int
 	flag.IntVar(&qps, "qps", 20, "QPS to use for the controller-runtime client")
 	flag.IntVar(&burst, "burst", 100, "Burst to use for the controller-runtime client")
@@ -241,7 +244,7 @@ func main() {
 
 			Skipper: psk,
 
-			SkipValidateQuota: disableUsageProfiles,
+			SkipValidateQuota: disableUsageProfiles && !legacyNamespaceQuotaEnabled,
 
 			OrganizationLabel:                 conf.OrganizationLabel,
 			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,
@@ -249,7 +252,8 @@ func main() {
 			SelectedProfile:        selectedUsageProfile,
 			QuotaOverrideNamespace: conf.QuotaOverrideNamespace,
 
-			LegacyNamespaceQuota: conf.LegacyNamespaceQuota,
+			EnableLegacyNamespaceQuota: legacyNamespaceQuotaEnabled,
+			LegacyNamespaceQuota:       conf.LegacyNamespaceQuota,
 		},
 	})
 

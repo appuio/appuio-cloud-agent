@@ -344,6 +344,9 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 				LegacyNamespaceQuota:   test.legacyQuota,
 			}
 
+			if test.legacyQuota > 0 {
+				subject.EnableLegacyNamespaceQuota = true
+			}
 			if test.disableProfile {
 				subject.SelectedProfile = ""
 			}
