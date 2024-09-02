@@ -93,7 +93,7 @@ func Test_PodNodeSelectorMutator_Handle(t *testing.T) {
 				DefaultNamespaceNodeSelectorAnnotation: nodeSelAnnotation,
 			}
 
-			pod := newPod(tc.namespace, "test", tc.nodeSelector)
+			pod := newPodWithNodeSelector(tc.namespace, "test", tc.nodeSelector)
 			resp := subject.Handle(context.Background(), admissionRequestForObject(t, pod, scheme))
 			t.Log("Response:", resp.Result.Reason, resp.Result.Message)
 			require.ElementsMatch(t, tc.patch, resp.Patches)

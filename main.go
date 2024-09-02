@@ -89,6 +89,9 @@ func main() {
 	var legacyNamespaceQuotaEnabled bool
 	flag.BoolVar(&legacyNamespaceQuotaEnabled, "legacy-namespace-quota-enabled", false, "Enable the legacy namespace quota controller. This controller is deprecated and will be removed in the future.")
 
+	var podRunOnceActiveDeadlineSecondsMutatorEnabled bool
+	flag.BoolVar(&podRunOnceActiveDeadlineSecondsMutatorEnabled, "pod-run-once-active-deadline-seconds-mutator-enabled", false, "Enable the PodRunOnceActiveDeadlineSecondsMutator webhook. Adds .spec.activeDeadlineSeconds to pods with the restartPolicy set to 'OnFailure' or 'Never'.")
+
 	var qps, burst int
 	flag.IntVar(&qps, "qps", 20, "QPS to use for the controller-runtime client")
 	flag.IntVar(&burst, "burst", 100, "Burst to use for the controller-runtime client")
@@ -293,6 +296,18 @@ func main() {
 			ReservedNamespaces: conf.ReservedNamespaces,
 			AllowedAnnotations: conf.AllowedAnnotations,
 			AllowedLabels:      conf.AllowedLabels,
+		},
+	})
+
+	mgr.GetWebhookServer().Register("/mutate-pod-run-once-active-deadline", &webhook.Admission{
+		Handler: &webhooks.PodRunOnceActiveDeadlineSecondsMutator{
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
+			Client:  mgr.GetClient(),
+
+			Skipper: skipper.StaticSkipper{ShouldSkip: !podRunOnceActiveDeadlineSecondsMutatorEnabled},
+
+			OverrideAnnotation:           conf.PodRunOnceActiveDeadlineSecondsOverrideAnnotation,
+			DefaultActiveDeadlineSeconds: conf.PodRunOnceActiveDeadlineSecondsDefault,
 		},
 	})
 

@@ -47,3 +47,8 @@ AllowedAnnotations: [appuio.io/default-node-selector]
 # AllowedLabels is a list of labels that are allowed on namespaces.
 # Supports '*' and '?' wildcards.
 AllowedLabels: [appuio.io/organization]
+
+# PodRunOnceActiveDeadlineSecondsOverrideAnnotation is the annotation used to override the activeDeadlineSeconds for RunOnce pods.
+PodRunOnceActiveDeadlineSecondsOverrideAnnotation: appuio.io/active-deadline-seconds-override
+# PodRunOnceActiveDeadlineSecondsDefault is the default activeDeadlineSeconds for RunOnce pods.
+PodRunOnceActiveDeadlineSecondsDefault: 1800
