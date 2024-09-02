@@ -86,7 +86,7 @@ func (m *PodRunOnceActiveDeadlineSecondsMutator) handle(ctx context.Context, req
 
 	return admission.Patched(msg, jsonpatch.Operation{
 		Operation: "add",
-		Path:      "/spec/restartPolicy",
+		Path:      "/spec/activeDeadlineSeconds",
 		Value:     ads,
 	})
 }
