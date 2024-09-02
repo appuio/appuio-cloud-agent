@@ -66,6 +66,11 @@ type Config struct {
 
 	// LegacyNamespaceQuota is the default quota for namespaces if no ZoneUsageProfile is selected.
 	LegacyNamespaceQuota int
+
+	// PodRunOnceActiveDeadlineSecondsOverrideAnnotation is the annotation used to override the activeDeadlineSeconds for RunOnce pods.
+	PodRunOnceActiveDeadlineSecondsOverrideAnnotation string
+	// PodRunOnceActiveDeadlineSecondsDefault is the default activeDeadlineSeconds for RunOnce pods.
+	PodRunOnceActiveDeadlineSecondsDefault int
 }
 
 func ConfigFromFile(path string) (c Config, warn []string, err error) {

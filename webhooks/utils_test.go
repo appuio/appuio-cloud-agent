@@ -132,7 +132,13 @@ func prepareClient(t *testing.T, initObjs ...client.Object) (client.WithWatch, *
 	return client, scheme, decoder
 }
 
-func newPod(namespace, name string, nodeSelector map[string]string) *corev1.Pod {
+func newPodWithNodeSelector(namespace, name string, nodeSelector map[string]string) *corev1.Pod {
+	return newPodWithSpec(namespace, name, corev1.PodSpec{
+		NodeSelector: nodeSelector,
+	})
+}
+
+func newPodWithSpec(namespace, name string, spec corev1.PodSpec) *corev1.Pod {
 	return &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -142,8 +148,6 @@ func newPod(namespace, name string, nodeSelector map[string]string) *corev1.Pod 
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: corev1.PodSpec{
-			NodeSelector: nodeSelector,
-		},
+		Spec: spec,
 	}
 }
