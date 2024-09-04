@@ -52,3 +52,70 @@ AllowedLabels: [appuio.io/organization]
 PodRunOnceActiveDeadlineSecondsOverrideAnnotation: appuio.io/active-deadline-seconds-override
 # PodRunOnceActiveDeadlineSecondsDefault is the default activeDeadlineSeconds for RunOnce pods.
 PodRunOnceActiveDeadlineSecondsDefault: 1800
+
+# LegacyResourceQuotaAnnotationBase is the base label for the default resource quotas.
+# The actual annotation is `$base/$quotaname.$resource`.
+LegacyResourceQuotaAnnotationBase: resourcequota.appuio.io
+# LegacyDefaultResourceQuotas is a map containing the default resource quotas for each organization.
+# The keys are the name of the manifest and the values are the resource quotas spec.
+LegacyDefaultResourceQuotas:
+  # See https://kb.vshn.ch/appuio-cloud/references/quality-requirements/performance/resource-quota.html
+  organization-objects:
+    hard:
+      count/configmaps: "150"
+      count/jobs.batch: "150"
+      count/secrets: "150"
+      count/services: "20"
+      count/services.loadbalancers: "0"
+      count/services.nodeports: "0"
+      count/replicationcontrollers: "100"
+      openshift.io/imagestreams: "20"
+      openshift.io/imagestreamtags: "50"
+
+      requests.storage: 1000Gi
+      persistentvolumeclaims: "10"
+      localblock-storage.storageclass.storage.k8s.io/persistentvolumeclaims: "0"
+      requests.ephemeral-storage: "250Mi"
+      limits.ephemeral-storage: "500Mi"
+
+      # Limit the total amount of Rook-Ceph backed storage which can be
+      # requested per namespace
+      cephfs-fspool-cluster.storageclass.storage.k8s.io/requests.storage: 25Gi
+      rbd-storagepool-cluster.storageclass.storage.k8s.io/requests.storage: 25Gi
+
+  organization-compute:
+    hard:
+      requests.cpu: 4
+      requests.memory: 4Gi
+      limits.cpu: 8
+      limits.memory: 20Gi
+      pods: "45"
+    scopes:
+      - NotTerminating
+
+  organization-compute-terminating:
+    hard:
+      limits.cpu: 4000m
+      limits.memory: 4Gi
+      pods: "5"
+      requests.cpu: 500m
+      requests.memory: 2Gi
+    scopes:
+      - Terminating
+
+# LegacyLimitRangeName is the name of the default limit range.
+LegacyLimitRangeName: organization
+# LegacyDefaultLimitRange is the default limit range.
+LegacyDefaultLimitRange:
+  limits:
+    - type: Container
+      min:
+        cpu: "10m"
+        memory: "4Mi"
+        ephemeral-storage: "100Ki"
+      default:
+        cpu: "600m"
+        memory: "768Mi"
+      defaultRequest:
+        cpu: "10m"
+        memory: "100Mi"

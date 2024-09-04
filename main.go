@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"flag"
+	"maps"
 	"os"
+	"slices"
 	"time"
 
 	controlv1 "github.com/appuio/control-api/apis/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	"go.uber.org/multierr"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -17,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -28,6 +32,7 @@ import (
 	"github.com/appuio/appuio-cloud-agent/ratio"
 	"github.com/appuio/appuio-cloud-agent/skipper"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
+	whoamicli "github.com/appuio/appuio-cloud-agent/whoami"
 )
 
 var (
@@ -88,6 +93,9 @@ func main() {
 
 	var legacyNamespaceQuotaEnabled bool
 	flag.BoolVar(&legacyNamespaceQuotaEnabled, "legacy-namespace-quota-enabled", false, "Enable the legacy namespace quota controller. This controller is deprecated and will be removed in the future.")
+
+	var legacyResourceQuotaEnabled bool
+	flag.BoolVar(&legacyResourceQuotaEnabled, "legacy-resource-quota-enabled", false, "Enable the legacy resource quota controller. This controller is deprecated and will be removed in the future.")
 
 	var podRunOnceActiveDeadlineSecondsMutatorEnabled bool
 	flag.BoolVar(&podRunOnceActiveDeadlineSecondsMutatorEnabled, "pod-run-once-active-deadline-seconds-mutator-enabled", false, "Enable the PodRunOnceActiveDeadlineSecondsMutator webhook. Adds .spec.activeDeadlineSeconds to pods with the restartPolicy set to 'OnFailure' or 'Never'.")
@@ -229,11 +237,21 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	if legacyResourceQuotaEnabled {
+		if err := (&controllers.LegacyResourceQuotaReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("legacy-resource-quota-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "legacy-resource-quota-controller")
+			os.Exit(1)
+		}
+	}
 
 	psk := &skipper.PrivilegedUserSkipper{
 		Client: mgr.GetClient(),
 
-		PrivilegedUsers:        conf.PrivilegedUsers,
+		PrivilegedUsers:        append(conf.PrivilegedUsers, whoami(mgr).Username),
 		PrivilegedGroups:       conf.PrivilegedGroups,
 		PrivilegedClusterRoles: conf.PrivilegedClusterRoles,
 	}
@@ -267,6 +285,19 @@ func main() {
 				skipper.StaticSkipper{ShouldSkip: !cloudscaleLoadbalancerValidationEnabled},
 				psk,
 			),
+		},
+	})
+
+	mgr.GetWebhookServer().Register("/validate-reserved-resourcequota-limitrange", &webhook.Admission{
+		Handler: &webhooks.ReservedResourceQuotaLimitRangeValidator{
+			Decoder: admission.NewDecoder(mgr.GetScheme()),
+			Skipper: skipper.NewMultiSkipper(
+				skipper.StaticSkipper{ShouldSkip: !legacyResourceQuotaEnabled},
+				psk,
+			),
+
+			ReservedResourceQuotaNames: slices.Collect(maps.Keys(conf.LegacyDefaultResourceQuotas)),
+			ReservedLimitRangeNames:    []string{conf.LegacyLimitRangeName},
 		},
 	})
 
@@ -336,6 +367,23 @@ func main() {
 		setupLog.Error(err, "failed to start")
 		os.Exit(1)
 	}
+}
+
+func whoami(mgr manager.Manager) authenticationv1.UserInfo {
+	wc, err := whoamicli.WhoamiForConfigAndClient(mgr.GetConfig(), mgr.GetHTTPClient())
+	if err != nil {
+		setupLog.Error(err, "unable to create whoami client")
+		os.Exit(1)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	userInfo, err := wc.Whoami(ctx)
+	if err != nil {
+		setupLog.Error(err, "unable to get current user")
+		os.Exit(1)
+	}
+	setupLog.Info("I am", "userinfo", userInfo)
+	return userInfo
 }
 
 func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, conf Config) {
