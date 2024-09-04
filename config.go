@@ -7,6 +7,7 @@ import (
 	"github.com/appuio/appuio-cloud-agent/limits"
 	"go.uber.org/multierr"
 	"gopkg.in/inf.v0"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/yaml"
 )
@@ -71,6 +72,18 @@ type Config struct {
 	PodRunOnceActiveDeadlineSecondsOverrideAnnotation string
 	// PodRunOnceActiveDeadlineSecondsDefault is the default activeDeadlineSeconds for RunOnce pods.
 	PodRunOnceActiveDeadlineSecondsDefault int
+
+	// LegacyResourceQuotaAnnotationBase is the base label for the default resource quotas.
+	// The actual annotation is `$base/$quotaname.$resource`.
+	LegacyResourceQuotaAnnotationBase string
+	// LegacyDefaultResourceQuotas is a map containing the default resource quotas for each organization.
+	// The keys are the name of the manifest and the values are the resource quotas spec.
+	LegacyDefaultResourceQuotas map[string]corev1.ResourceQuotaSpec
+
+	// LegacyLimitRangeName is the name of the default limit range.
+	LegacyLimitRangeName string
+	// LegacyDefaultLimitRange is the default limit range.
+	LegacyDefaultLimitRange corev1.LimitRangeSpec
 }
 
 func ConfigFromFile(path string) (c Config, warn []string, err error) {
