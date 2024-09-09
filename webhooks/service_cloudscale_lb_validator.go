@@ -28,7 +28,7 @@ type ServiceCloudscaleLBValidator struct {
 // Handle handles the admission requests
 func (v *ServiceCloudscaleLBValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	ctx = log.IntoContext(ctx, log.FromContext(ctx).
-		WithName("webhook.validate-namespace-quota.appuio.io").
+		WithName("webhook.service-cloudscale-lb-validator.appuio.io").
 		WithValues("id", req.UID, "user", req.UserInfo.Username).
 		WithValues("namespace", req.Namespace, "name", req.Name,
 			"group", req.Kind.Group, "version", req.Kind.Version, "kind", req.Kind.Kind))
