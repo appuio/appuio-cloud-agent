@@ -8,13 +8,13 @@ require (
 	github.com/appuio/control-api v0.33.3
 	github.com/go-logr/logr v1.4.2
 	github.com/minio/pkg v1.7.5
-	github.com/openshift/api v0.0.0-20240729140855-0a58f8c30a8c // release-4.15
+	github.com/openshift/api v0.0.0-20241024191314-684b2b1679ba // release-4.15
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0
 	gopkg.in/inf.v0 v0.9.1
-	k8s.io/api v0.31.0
-	k8s.io/apimachinery v0.31.0
+	k8s.io/api v0.31.1
+	k8s.io/apimachinery v0.31.1
 	k8s.io/client-go v0.31.0
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 	sigs.k8s.io/controller-runtime v0.19.0
