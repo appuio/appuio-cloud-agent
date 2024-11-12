@@ -15,6 +15,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
@@ -33,6 +34,8 @@ import (
 	"github.com/appuio/appuio-cloud-agent/skipper"
 	"github.com/appuio/appuio-cloud-agent/webhooks"
 	whoamicli "github.com/appuio/appuio-cloud-agent/whoami"
+
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 var (
@@ -56,6 +59,7 @@ func init() {
 	utilruntime.Must(projectv1.AddToScheme(scheme))
 	utilruntime.Must(agentv1.AddToScheme(scheme))
 	utilruntime.Must(controlv1.AddToScheme(scheme))
+	utilruntime.Must(configv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -77,7 +81,7 @@ func main() {
 	flag.StringVar(&controlAPIURL, "control-api-url", "", "URL of the control API. If set agent does not use `-kubeconfig-control-api`. Expects a bearer token in `CONTROL_API_BEARER_TOKEN` env var.")
 
 	var upstreamZoneIdentifier string
-	flag.StringVar(&upstreamZoneIdentifier, "upstream-zone-identifier", "", "Identifies the agent in the control API. Currently used for Team/OrganizationMembers finalizer. Must be set if the GroupSync controller is enabled.")
+	flag.StringVar(&upstreamZoneIdentifier, "upstream-zone-identifier", "", "Identifies the agent in the control API. Currently used for Team/OrganizationMembers finalizer and the K8s version reporting.")
 
 	var selectedUsageProfile string
 	flag.StringVar(&selectedUsageProfile, "usage-profile", "", "UsageProfile to use. Applies all profiles if empty. Dynamic selection is not supported yet.")
@@ -175,8 +179,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if upstreamZoneIdentifier == "" {
+		setupLog.Error(err, "upstream-zone-identifier must be set.")
+		os.Exit(1)
+	}
+
 	registerRatioController(mgr, conf, conf.OrganizationLabel)
 	registerOrganizationRBACController(mgr, conf.OrganizationLabel, conf.DefaultOrganizationClusterRoles)
+	registerZoneK8sVersionController(mgr, controlAPICluster, upstreamZoneIdentifier)
 
 	if !disableUserAttributeSync {
 		if err := (&controllers.UserAttributeSyncReconciler{
@@ -191,10 +201,6 @@ func main() {
 		}
 	}
 	if !disableGroupSync {
-		if upstreamZoneIdentifier == "" {
-			setupLog.Error(err, "upstream-zone-identifier must be set if GroupSync controller is enabled")
-			os.Exit(1)
-		}
 		if err := (&controllers.GroupSyncReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -449,6 +455,27 @@ func registerRatioController(mgr ctrl.Manager, conf Config, orgLabel string) {
 		RatioWarnThreshold: conf.MemoryPerCoreWarnThreshold,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ratio")
+		os.Exit(1)
+	}
+}
+
+func registerZoneK8sVersionController(mgr ctrl.Manager, controlAPICluster cluster.Cluster, upstreamZoneIdentifier string) {
+	restclient, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create clientset for config", "controller", "zone-k8s-version")
+		os.Exit(1)
+	}
+	if err := (&controllers.ZoneK8sVersionReconciler{
+		Client:     mgr.GetClient(),
+		RESTClient: restclient.RESTClient(),
+		Recorder:   mgr.GetEventRecorderFor("zone-k8s-version-controller"),
+		Scheme:     mgr.GetScheme(),
+
+		ForeignClient: controlAPICluster.GetClient(),
+
+		ZoneID: upstreamZoneIdentifier,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "zone-k8s-version")
 		os.Exit(1)
 	}
 }
