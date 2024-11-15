@@ -12,6 +12,7 @@ rules:
   - users
   - teams
   - organizationmembers
+  - zones
   verbs:
   - get
   - list
@@ -23,6 +24,7 @@ rules:
   - teams/finalizers
   - organizationmembers
   - organizationmembers/finalizers
+  - zones
   verbs:
   - update
   - patch
