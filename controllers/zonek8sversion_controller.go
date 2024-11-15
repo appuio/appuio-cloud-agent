@@ -59,7 +59,7 @@ func (r *ZoneK8sVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	l.Info("OCP current version", "version", ocpVersion)
+	l.Info("OCP current version", "version", formatVersion(ocpVersion))
 
 	// We don't use client-go's ServerVersion() so we get context support
 	body, err := r.RESTClient.Get().AbsPath("/version").Do(ctx).Raw()
@@ -71,7 +71,7 @@ func (r *ZoneK8sVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	l.Info("K8s current version", "version", k8sVersion)
+	l.Info("K8s current version", "version", formatVersion(&k8sVersion))
 
 	// List zones by label because we don't enforce any naming conventions
 	// for the Zone objects on the control-api cluster.
@@ -91,10 +91,8 @@ func (r *ZoneK8sVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	var errs []error
 	for _, z := range zones.Items {
-		z.Data.Features[kubernetesVersionFeatureKey] =
-			fmt.Sprintf("%s.%s", k8sVersion.Major, k8sVersion.Minor)
-		z.Data.Features[openshiftVersionFeatureKey] =
-			fmt.Sprintf("%s.%s", ocpVersion.Major, ocpVersion.Minor)
+		z.Data.Features[kubernetesVersionFeatureKey] = formatVersion(&k8sVersion)
+		z.Data.Features[openshiftVersionFeatureKey] = formatVersion(ocpVersion)
 		if err := r.ForeignClient.Update(ctx, &z); err != nil {
 			errs = append(errs, err)
 		}
@@ -135,4 +133,8 @@ func extractOpenShiftVersion(cv *configv1.ClusterVersion) (*version.Info, error)
 		Minor: verparts[1],
 	}
 	return &version, nil
+}
+
+func formatVersion(v *version.Info) string {
+	return fmt.Sprintf("%s.%s", v.Major, v.Minor)
 }
