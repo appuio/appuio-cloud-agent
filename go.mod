@@ -11,7 +11,7 @@ require (
 	github.com/openshift/api v0.0.0-20240830023148-b7d0481c9094 // release-4.16
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
-	gomodules.xyz/jsonpatch/v2 v2.4.0
+	gomodules.xyz/jsonpatch/v2/v3 v3.0.1
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.31.2
 	k8s.io/apimachinery v0.31.2
