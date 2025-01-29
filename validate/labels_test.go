@@ -50,8 +50,8 @@ func Test_AllowedLabels_Validate(t *testing.T) {
 func Test_AllowedLabels_String(t *testing.T) {
 	v := validate.AllowedLabels{}
 
-	v.Add("my.ns.io/node-class", "flex|plus")
+	v.Add("my.ns.io/node-class", "flex|plus|night")
 	v.Add("app", ".+")
 
-	assert.Equal(t, "allowed { ^(?:my.ns.io/node-class)$=^(?:flex|plus)$, ^(?:app)$=^(?:.+)$ }", v.String())
+	assert.Equal(t, "allowed { ^(?:my.ns.io/node-class)$=^(?:flex|plus|night)$, ^(?:app)$=^(?:.+)$ }", v.String())
 }
