@@ -10,6 +10,3 @@ PrivilegedUsers: []
 PrivilegedRoles: []
 PrivilegedClusterRoles:
   - cluster-admin
-# Key and values are anchored regexes
-AllowedNodeSelectors:
-  appuio.io/node-class: flex|plus
