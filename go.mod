@@ -19,13 +19,13 @@ require (
 	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078
 	sigs.k8s.io/controller-runtime v0.19.1
 	sigs.k8s.io/controller-tools v0.16.5
-	sigs.k8s.io/kind v0.25.0
+	sigs.k8s.io/kind v0.27.0
 	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
+	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
-	github.com/alessio/shellescape v1.4.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
