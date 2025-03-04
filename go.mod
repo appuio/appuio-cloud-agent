@@ -2,7 +2,7 @@ module github.com/appuio/appuio-cloud-agent
 
 go 1.23
 
-toolchain go1.23.3
+toolchain go1.24.1
 
 require (
 	github.com/appuio/control-api v0.33.4
