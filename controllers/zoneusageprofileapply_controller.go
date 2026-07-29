@@ -8,8 +8,8 @@ import (
 
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
@@ -46,7 +46,7 @@ type ZoneUsageProfileApplyReconciler struct {
 	// watchTracker keeps track of which resources are already being watched.
 	watchTracker sync.Map
 
-	OrganizationLabel string
+	NamespaceSelector labels.Selector
 	Transformers      []transformers.Transformer
 
 	// SelectedProfile applies only selected profile, if set. Dynamic selection is in future tickets.
@@ -79,7 +79,7 @@ func (r *ZoneUsageProfileApplyReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	var orgNsl corev1.NamespaceList
-	if err := r.Client.List(ctx, &orgNsl, client.HasLabels{r.OrganizationLabel}); err != nil {
+	if err := r.Client.List(ctx, &orgNsl, client.MatchingLabelsSelector{Selector: r.NamespaceSelector}); err != nil {
 		l.Error(err, "unable to list Namespaces")
 		return ctrl.Result{}, err
 	}
@@ -180,7 +180,7 @@ func (r *ZoneUsageProfileApplyReconciler) ensureWatch(ctx context.Context, gvk s
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ZoneUsageProfileApplyReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	orgPredicate, err := labelExistsPredicate(r.OrganizationLabel)
+	orgPredicate, err := labelSelectorPredicate(r.NamespaceSelector)
 	if err != nil {
 		return fmt.Errorf("unable to create LabelSelectorPredicate: %w", err)
 	}
@@ -201,13 +201,11 @@ func (r *ZoneUsageProfileApplyReconciler) SetupWithManager(mgr ctrl.Manager) err
 	return nil
 }
 
-// labelExistsPredicate returns a predicate that matches objects with the given label.
-func labelExistsPredicate(label string) (predicate.Predicate, error) {
-	return predicate.LabelSelectorPredicate(metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      label,
-			Operator: metav1.LabelSelectorOpExists,
-		}}})
+// labelSelectorPredicate returns a predicate that matches objects with the given label.
+func labelSelectorPredicate(sel labels.Selector) (predicate.Predicate, error) {
+	return predicate.NewPredicateFuncs(func(o client.Object) bool {
+		return sel.Matches(labels.Set(o.GetLabels()))
+	}), nil
 }
 
 // mapToAllUsageProfiles returns a MapFunc that enqueues reconcile requests for all ZoneUsageProfiles on every event.

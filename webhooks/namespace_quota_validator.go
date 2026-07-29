@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -41,6 +42,7 @@ type NamespaceQuotaValidator struct {
 	SkipValidateQuota bool
 
 	OrganizationLabel                 string
+	NamespaceSelector                 labels.Selector
 	UserDefaultOrganizationAnnotation string
 
 	// SelectedProfile is the name of the ZoneUsageProfile to use for the quota
@@ -150,7 +152,7 @@ func (v *NamespaceQuotaValidator) handle(ctx context.Context, req admission.Requ
 
 	// count namespaces for organization
 	var nsList corev1.NamespaceList
-	if err := v.Client.List(ctx, &nsList, client.MatchingLabels{
+	if err := v.Client.List(ctx, &nsList, client.MatchingLabelsSelector{Selector: v.NamespaceSelector}, client.MatchingLabels{
 		v.OrganizationLabel: organizationName,
 	}); err != nil {
 		l.Error(err, "error while listing namespaces")

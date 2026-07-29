@@ -2,16 +2,19 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -22,6 +25,8 @@ type OrganizationRBACReconciler struct {
 	client.Client
 	Recorder record.EventRecorder
 	Scheme   *runtime.Scheme
+
+	NamespaceSelector labels.Selector
 
 	// OrganizationLabel is the label that marks to what organization (if any) the namespace belongs to
 	OrganizationLabel string
@@ -57,6 +62,11 @@ func (r *OrganizationRBACReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	if ns.DeletionTimestamp != nil {
 		l.Info("namespace is being deleted, skipping reconciliation")
+		return ctrl.Result{}, nil
+	}
+
+	if !r.NamespaceSelector.Matches(labels.Set(ns.Labels)) {
+		l.Info("Namespace does not match namespace selector, skipping reconciliation")
 		return ctrl.Result{}, nil
 	}
 
@@ -143,8 +153,12 @@ func rolebindingIsUninitialized(rolebinding *rbacv1.RoleBinding) bool {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OrganizationRBACReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	p, err := labelSelectorPredicate(r.NamespaceSelector)
+	if err != nil {
+		return fmt.Errorf("failed to create predicate: %w", err)
+	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Namespace{}).
+		For(&corev1.Namespace{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.RoleBinding{}).
 		Complete(r)
 }

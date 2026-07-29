@@ -15,6 +15,11 @@ import (
 type Config struct {
 	// OrganizationLabel is the label used to mark namespaces to belong to an organization
 	OrganizationLabel string
+	// UnmanagedOrganizationNamespaceLabel is the label used to mark namespaces that should not be
+	// managed by this controller or its webhooks and this should not be restricted by resource quotas
+	// and limit ranges, even if they belong to an organization.
+	// The controller doesn't look at the value of this label, it only looks for the label and skips any namespaces that have both the organization label and this label.
+	UnmanagedOrganizationNamespaceLabel string
 
 	// UserDefaultOrganizationAnnotation is the annotation the default organization setting for a user is stored in.
 	UserDefaultOrganizationAnnotation string
@@ -105,6 +110,9 @@ func (c Config) Validate() error {
 
 	if c.OrganizationLabel == "" {
 		errs = append(errs, errors.New("OrganizationLabel must not be empty"))
+	}
+	if c.UnmanagedOrganizationNamespaceLabel == "" {
+		errs = append(errs, errors.New("UnmanagedOrganizationNamespaceLabel must not be empty"))
 	}
 
 	return multierr.Combine(errs...)

@@ -20,7 +20,7 @@ var ErrorDisabled error = errors.New("request ratio validation disabled")
 type Fetcher struct {
 	Client client.Client
 
-	OrganizationLabel string
+	NamespaceSelector labels.Selector
 }
 
 // FetchRatios collects the CPU to memory request ratio for the given namespace grouped by `.spec.nodeSelector`.
@@ -41,8 +41,8 @@ func (f Fetcher) FetchRatios(ctx context.Context, name string) (map[string]*Rati
 		}
 	}
 
-	if f.OrganizationLabel != "" {
-		if _, isOrgNs := ns.Labels[f.OrganizationLabel]; !isOrgNs {
+	if f.NamespaceSelector != nil {
+		if !f.NamespaceSelector.Matches(labels.Set(ns.Labels)) {
 			return nil, ErrorDisabled
 		}
 	}

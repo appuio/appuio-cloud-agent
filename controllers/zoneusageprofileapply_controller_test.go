@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -53,13 +54,16 @@ func Test_ZoneUsageProfileApplyReconciler_Reconcile(t *testing.T) {
 	org2NS := newNamespace("org2", map[string]string{orgLbl: "bar"}, nil)
 	require.NoError(t, c.Create(context.Background(), org2NS))
 
+	nsSel, err := labels.Parse(orgLbl)
+	require.NoError(t, err)
+
 	subject := &ZoneUsageProfileApplyReconciler{
 		Client:   c,
 		Scheme:   scheme,
 		Recorder: recorder,
 		Cache:    mgr.GetCache(),
 
-		OrganizationLabel: orgLbl,
+		NamespaceSelector: nsSel,
 
 		Transformers: []transformers.Transformer{
 			addTestAnnotationTransformer{},
@@ -121,9 +125,11 @@ func requireEventually(t *testing.T, f func(collect *assert.CollectT), msgAndArg
 	require.EventuallyWithT(t, f, 10*time.Second, time.Second/10, msgAndArgs...)
 }
 
-func Test_labelExistsPredicate(t *testing.T) {
+func Test_labelSelectorPredicate(t *testing.T) {
 	lbl := "test.com/organization"
-	subject, err := labelExistsPredicate(lbl)
+	sel, err := labels.Parse(lbl)
+	require.NoError(t, err)
+	subject, err := labelSelectorPredicate(sel)
 	require.NoError(t, err)
 
 	assert.True(t, subject.Generic(event.GenericEvent{

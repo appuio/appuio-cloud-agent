@@ -9,6 +9,7 @@ import (
 	"go.uber.org/multierr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -24,7 +25,7 @@ type LegacyResourceQuotaReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 
-	OrganizationLabel string
+	NamespaceSelector labels.Selector
 
 	ResourceQuotaAnnotationBase string
 	DefaultResourceQuotas       map[string]corev1.ResourceQuotaSpec
@@ -46,8 +47,8 @@ func (r *LegacyResourceQuotaReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	if _, ok := ns.Labels[r.OrganizationLabel]; !ok {
-		l.Info("Namespace does not have organization label, skipping reconciliation")
+	if !r.NamespaceSelector.Matches(labels.Set(ns.Labels)) {
+		l.Info("Namespace does not match namespace selector, skipping reconciliation")
 		return ctrl.Result{}, nil
 	}
 
@@ -127,7 +128,7 @@ func (r *LegacyResourceQuotaReconciler) Reconcile(ctx context.Context, req ctrl.
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *LegacyResourceQuotaReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	orgPredicate, err := labelExistsPredicate(r.OrganizationLabel)
+	orgPredicate, err := labelSelectorPredicate(r.NamespaceSelector)
 	if err != nil {
 		return fmt.Errorf("failed to create organization label predicate: %w", err)
 	}
