@@ -1,13 +1,4 @@
-FROM docker.io/library/alpine:3.20 as runtime
+FROM gcr.io/distroless/static:nonroot@sha256:963fa6c544fe5ce420f1f54fb88b6fb01479f054c8056d0f74cc2c6000df5240
 
-RUN \
-  apk add --update --no-cache \
-    bash \
-    curl \
-    ca-certificates \
-    tzdata
-
-ENTRYPOINT ["appuio-cloud-agent"]
+ENTRYPOINT ["/usr/bin/appuio-cloud-agent"]
 COPY appuio-cloud-agent /usr/bin/
-
-USER 65536:0
