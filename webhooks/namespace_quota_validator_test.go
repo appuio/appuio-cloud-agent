@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -328,6 +329,8 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			sel, err := labels.Parse(orgLabel)
+			require.NoError(t, err)
 			c, scheme, dec := prepareClient(t, test.initObjects...)
 			subject := &NamespaceQuotaValidator{
 				Decoder: dec,
@@ -336,6 +339,7 @@ func TestNamespaceQuotaValidator_Handle(t *testing.T) {
 
 				SkipValidateQuota: test.skipQuotaValidation,
 
+				NamespaceSelector:                 sel,
 				OrganizationLabel:                 orgLabel,
 				UserDefaultOrganizationAnnotation: userDefaultOrgAnnotation,
 

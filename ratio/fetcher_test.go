@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
@@ -274,9 +275,12 @@ func prepareTest(t *testing.T, cfg testCfg) Fetcher {
 		WithObjects(initObjs...).
 		Build()
 
+	nsSel, err := labels.Parse(cfg.orgLabel)
+	require.NoError(t, err)
+
 	return Fetcher{
 		Client:            failingClient{client},
-		OrganizationLabel: cfg.orgLabel,
+		NamespaceSelector: nsSel,
 	}
 }
 

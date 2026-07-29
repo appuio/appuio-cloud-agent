@@ -1,6 +1,8 @@
 ---
 # The label used to mark namespaces to belong to an organization
 OrganizationLabel: appuio.io/organization
+# The label used to mark namespaces that are not managed by the controller or its webhooks, but still belong to an organization.
+UnmanagedOrganizationNamespaceLabel: appuio.io/unmanaged-namespace
 # UserDefaultOrganizationAnnotation is the annotation the default organization setting for a user is stored in.
 UserDefaultOrganizationAnnotation: appuio.io/default-organization
 

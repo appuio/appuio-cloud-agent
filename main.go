@@ -13,7 +13,9 @@ import (
 	userv1 "github.com/openshift/api/user/v1"
 	"go.uber.org/multierr"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -184,8 +186,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	registerRatioController(mgr, conf, conf.OrganizationLabel)
-	registerOrganizationRBACController(mgr, conf.OrganizationLabel, conf.DefaultOrganizationClusterRoles)
+	nsSel, err := newNamespaceLabelSelector(conf.OrganizationLabel, conf.UnmanagedOrganizationNamespaceLabel)
+	if err != nil {
+		setupLog.Error(err, "unable to create namespace label selector")
+		os.Exit(1)
+	}
+
+	registerRatioController(mgr, conf, nsSel)
+	registerOrganizationRBACController(mgr, conf.OrganizationLabel, nsSel, conf.DefaultOrganizationClusterRoles)
 	registerZoneK8sVersionController(mgr, controlAPICluster, upstreamZoneIdentifier)
 
 	if !disableUserAttributeSync {
@@ -232,7 +240,7 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("usage-profile-apply-controller"),
 			Cache:    mgr.GetCache(),
 
-			OrganizationLabel: conf.OrganizationLabel,
+			NamespaceSelector: nsSel,
 			Transformers: []transformers.Transformer{
 				transformers.NewResourceQuotaTransformer("resourcequota.appuio.io"),
 			},
@@ -249,7 +257,7 @@ func main() {
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("legacy-resource-quota-controller"),
 
-			OrganizationLabel:           conf.OrganizationLabel,
+			NamespaceSelector:           nsSel,
 			ResourceQuotaAnnotationBase: conf.LegacyResourceQuotaAnnotationBase,
 			DefaultResourceQuotas:       conf.LegacyDefaultResourceQuotas,
 			LimitRangeName:              conf.LegacyLimitRangeName,
@@ -280,6 +288,7 @@ func main() {
 			SkipValidateQuota: disableUsageProfiles && !legacyNamespaceQuotaEnabled,
 
 			OrganizationLabel:                 conf.OrganizationLabel,
+			NamespaceSelector:                 nsSel,
 			UserDefaultOrganizationAnnotation: conf.UserDefaultOrganizationAnnotation,
 
 			SelectedProfile:        selectedUsageProfile,
@@ -412,21 +421,22 @@ func registerNodeSelectorValidationWebhooks(mgr ctrl.Manager, conf Config) {
 	})
 }
 
-func registerOrganizationRBACController(mgr ctrl.Manager, orgLabel string, defaultClusterRoles map[string]string) {
+func registerOrganizationRBACController(mgr ctrl.Manager, orgLabel string, nsSel labels.Selector, defaultClusterRoles map[string]string) {
 	if err := (&controllers.OrganizationRBACReconciler{
 		Client:   mgr.GetClient(),
 		Recorder: mgr.GetEventRecorderFor("organization-rbac-controller"),
 		Scheme:   mgr.GetScheme(),
 
 		OrganizationLabel:   orgLabel,
+		NamespaceSelector:   nsSel,
 		DefaultClusterRoles: defaultClusterRoles,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ratio")
+		setupLog.Error(err, "unable to create controller", "controller", "organization-rbac")
 		os.Exit(1)
 	}
 }
 
-func registerRatioController(mgr ctrl.Manager, conf Config, orgLabel string) {
+func registerRatioController(mgr ctrl.Manager, conf Config, nsSel labels.Selector) {
 	mgr.GetWebhookServer().Register("/validate-request-ratio", &webhook.Admission{
 		Handler: &webhooks.RatioValidator{
 			DefaultNodeSelector:                    conf.DefaultNodeSelector,
@@ -450,7 +460,7 @@ func registerRatioController(mgr ctrl.Manager, conf Config, orgLabel string) {
 		RatioLimits: conf.MemoryPerCoreLimits,
 		Ratio: &ratio.Fetcher{
 			Client:            mgr.GetClient(),
-			OrganizationLabel: orgLabel,
+			NamespaceSelector: nsSel,
 		},
 		RatioWarnThreshold: conf.MemoryPerCoreWarnThreshold,
 	}).SetupWithManager(mgr); err != nil {
@@ -478,4 +488,16 @@ func registerZoneK8sVersionController(mgr ctrl.Manager, controlAPICluster cluste
 		setupLog.Error(err, "unable to create controller", "controller", "zone-k8s-version")
 		os.Exit(1)
 	}
+}
+
+func newNamespaceLabelSelector(orgLabel, unmanagedOrgNsLabel string) (labels.Selector, error) {
+	orgReq, err := labels.NewRequirement(orgLabel, selection.Exists, nil)
+	if err != nil {
+		return nil, err
+	}
+	unmanagedReq, err := labels.NewRequirement(unmanagedOrgNsLabel, selection.DoesNotExist, nil)
+	if err != nil {
+		return nil, err
+	}
+	return labels.NewSelector().Add(*orgReq, *unmanagedReq), nil
 }

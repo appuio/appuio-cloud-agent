@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -407,11 +408,15 @@ func prepareOranizationRBACTest(t *testing.T, cfg testOrganizationRBACfg) *Organ
 		cfg.recorder = &record.FakeRecorder{}
 	}
 
+	sel, err := labels.Parse(cfg.organizationLabel)
+	require.NoError(t, err)
+
 	return &OrganizationRBACReconciler{
 		Client:              client,
 		Recorder:            cfg.recorder,
 		Scheme:              scheme,
 		OrganizationLabel:   cfg.organizationLabel,
+		NamespaceSelector:   sel,
 		DefaultClusterRoles: cfg.clusterRoles,
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,7 +29,7 @@ func Test_LegacyResourceQuotaReconciler_Reconcile(t *testing.T) {
 		Scheme:   scheme,
 		Recorder: recorder,
 
-		OrganizationLabel: "organization",
+		NamespaceSelector: labels.SelectorFromValidatedSet(labels.Set{"organization": "testorg"}),
 
 		ResourceQuotaAnnotationBase: "resourcequota.example.com",
 		DefaultResourceQuotas: map[string]corev1.ResourceQuotaSpec{
