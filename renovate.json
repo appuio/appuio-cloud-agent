@@ -1,8 +1,10 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base",
+    "config:recommended",
     ":gitSignOff",
-    ":disableDependencyDashboard"
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests"
   ],
   "labels": [
     "dependency"
@@ -10,27 +12,39 @@
   "postUpdateOptions": [
     "gomodTidy"
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/\\.github/workflows/.+\\.yml$/"
+      ],
+      "matchStrings": [
+        "goreleaser-version:\\s+[\"']?(?<currentValue>v?[0-9.]+)[\"']?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "goreleaser/goreleaser",
+      "versioningTemplate": "semver"
+    }
+  ],
   "packageRules": [
     {
-      "matchPackagePatterns": [
-        "golang.org/x/*"
-      ],
-      "groupName": "golang.org/x",
       "schedule": [
         "on the first day of the month"
       ],
-      "automerge": true
+      "automerge": true,
+      "matchPackageNames": [
+        "/k8s.io/utils/",
+        "/golang.org/x/exp/",
+        "/sigs.k8s.io/controller-runtime/tools/setup-envtest/"
+      ]
     },
     {
-      "matchPackagePatterns": [
-        "k8s.io/utils",
-        "sigs.k8s.io/controller-runtime/tools/setup-envtest"
-      ],
-      "groupName": "k8s.io/utils",
-      "schedule": [
-        "on the first day of the month"
-      ],
-      "automerge": true
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions dependencies",
+      "automerge": true,
+      "minimumReleaseAge": "7 days",
+      "prCreation": "not-pending",
+      "internalChecksFilter": "strict"
     }
   ]
 }
